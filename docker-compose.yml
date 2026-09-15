@@ -1,0 +1,67 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL (optional — only needed if you add JWT auth later) ────────
+  # db:
+  #   image: postgres:16-alpine
+  #   environment:
+  #     POSTGRES_USER: placement
+  #     POSTGRES_PASSWORD: placement
+  #     POSTGRES_DB: placement
+  #   volumes:
+  #     - pg_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U placement"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # ── Backend ──────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount data and models so trained artifacts persist between runs
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./configs:/app/configs
+    environment:
+      PYTHONUNBUFFERED: "1"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ── Model trainer (one-shot: runs train.py if model is absent) ───────────
+  trainer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./configs:/app/configs
+    entrypoint: >
+      sh -c "
+        if [ ! -f /app/models/bundle.joblib ]; then
+          echo 'No trained model found — running training pipeline…';
+          python -m src.train;
+        else
+          echo 'Model already exists — skipping training.';
+        fi
+      "
+    depends_on:
+      backend:
+        condition: service_started
+    restart: "no"
+
+# volumes:
+#   pg_data:

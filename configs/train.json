@@ -1,0 +1,14 @@
+{
+  "test_size": 0.2,
+  "cv_splits": 5,
+  "n_repeats": 3,
+  "n_trials": 25,
+  "use_smote": true,
+  "use_calibration": true,
+  "calibration_methods": ["isotonic", "sigmoid"],
+  "threshold_metric": "f1",
+  "tune_models": ["logistic", "random_forest", "gradient_boosting", "xgboost", "svc"],
+  "stackers": ["random_forest", "gradient_boosting", "xgboost"],
+  "use_voting": true,
+  "use_stacking": true
+}

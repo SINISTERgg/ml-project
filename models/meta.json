@@ -1,0 +1,143 @@
+{
+  "run_id": "20260911-110934-logisticregression",
+  "created_at": "2026-09-11T05:39:35Z",
+  "model_name": "LogisticRegression",
+  "estimator_key": "logistic",
+  "cv_roc_auc_mean": 0.9470543643058263,
+  "cv_roc_auc_std": 0.0365558542549688,
+  "study_scores": {
+    "logistic": 0.9395711500974657,
+    "random_forest": 0.9274204028589994,
+    "gradient_boosting": 0.9410331384015593,
+    "xgboost": 0.944558154645874,
+    "svc": 0.9406270305393111
+  },
+  "tuned_params": {
+    "logistic": {
+      "C": 6.206417252370874
+    },
+    "random_forest": {
+      "n_estimators": 600,
+      "max_depth": 8,
+      "min_samples_leaf": 1,
+      "max_features": "log2"
+    },
+    "gradient_boosting": {
+      "learning_rate": 0.056542201075504325,
+      "n_estimators": 52,
+      "max_depth": 5,
+      "subsample": 0.6682096494749166
+    },
+    "xgboost": {
+      "learning_rate": 0.12981109911047786,
+      "n_estimators": 230,
+      "max_depth": 4,
+      "subsample": 0.7102444882369005,
+      "colsample_bytree": 0.7170516977147613,
+      "reg_lambda": 2.0990104096506754
+    },
+    "svc": {
+      "C": 266.0231021530118,
+      "gamma": 0.002089535762450128
+    }
+  },
+  "threshold": 0.8100622043980876,
+  "threshold_metric": "f1",
+  "test_metrics": {
+    "accuracy": 0.7441860465116279,
+    "precision": 0.9523809523809523,
+    "recall": 0.6666666666666666,
+    "f1": 0.7843137254901961,
+    "roc_auc": 0.9076923076923077,
+    "pr_auc": 0.9599247647035782,
+    "brier": 0.12667211280613622,
+    "threshold": 0.8100622043980876
+  },
+  "calibration_method": "sigmoid",
+  "calibration_results": {
+    "none": 0.13123599554584553,
+    "isotonic": 0.14287263334442937,
+    "sigmoid": 0.1280114132128027
+  },
+  "explanation_mode": "exact",
+  "surrogate_model": null,
+  "feature_names": [
+    "num__ssc_p",
+    "num__hsc_p",
+    "num__degree_p",
+    "num__etest_p",
+    "num__mba_p",
+    "num__academic_avg",
+    "num__performance_gap",
+    "num__stem_flag",
+    "cat__gender_M",
+    "cat__ssc_b_Others",
+    "cat__hsc_b_Others",
+    "cat__hsc_s_Arts",
+    "cat__hsc_s_Commerce",
+    "cat__hsc_s_Science",
+    "cat__degree_t_Comm&Mgmt",
+    "cat__degree_t_Others",
+    "cat__degree_t_Sci&Tech",
+    "cat__workex_Yes",
+    "cat__specialisation_Mkt&HR"
+  ],
+  "label_map": {
+    "Not Placed": 0,
+    "Placed": 1
+  },
+  "n_train": 137,
+  "n_val": 35,
+  "n_test": 43,
+  "settings": {
+    "test_size": 0.2,
+    "cv_splits": 5,
+    "n_repeats": 3,
+    "n_trials": 25,
+    "use_smote": true,
+    "use_calibration": true,
+    "calibration_methods": [
+      "isotonic",
+      "sigmoid"
+    ],
+    "threshold_metric": "f1",
+    "tune_models": [
+      "logistic",
+      "random_forest",
+      "gradient_boosting",
+      "xgboost",
+      "svc"
+    ],
+    "stackers": [
+      "random_forest",
+      "gradient_boosting",
+      "xgboost"
+    ],
+    "use_voting": true,
+    "use_stacking": true
+  },
+  "elapsed_seconds": 103.5,
+  "learning_curve": {
+    "train_sizes": [
+      32,
+      51,
+      70,
+      89,
+      109
+    ],
+    "train": [
+      1.0,
+      0.9916220322311154,
+      0.9823872301611433,
+      0.9837833625560102,
+      0.9799270194564313
+    ],
+    "cv": [
+      0.8795971410006498,
+      0.9203216374269007,
+      0.9350389863547758,
+      0.9335607537361923,
+      0.9395711500974657
+    ]
+  }
+}

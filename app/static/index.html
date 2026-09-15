@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PlaceIQ — Student Placement Predictor</title>
+  <meta name="description" content="AI-powered campus placement prediction with SHAP explanations, salary estimation, and counterfactual suggestions." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<!-- ── Hero ─────────────────────────────────────────────────────────────── -->
+<header class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge">AI · Campus Placement Predictor</div>
+    <h1>PlaceIQ <span class="gradient-text">Predictor</span></h1>
+    <p class="subtitle">
+      Powered by XGBoost + SHAP · Per-prediction explanations · Salary estimation · Drift monitoring
+    </p>
+    <!-- Model status chips -->
+    <div class="chips" id="meta-chips">
+      <span class="chip skeleton">model…</span>
+      <span class="chip skeleton">ROC-AUC…</span>
+      <span class="chip skeleton">F1…</span>
+      <span class="chip skeleton">Brier…</span>
+    </div>
+    <div class="mono-line" id="run-line">run unknown</div>
+  </div>
+  <div class="hero-glow hero-glow-1"></div>
+  <div class="hero-glow hero-glow-2"></div>
+</header>
+
+<!-- ── Tab nav ───────────────────────────────────────────────────────────── -->
+<nav class="tab-nav" role="tablist">
+  <button id="tab-predict" class="tab-btn active" role="tab" aria-selected="true"  aria-controls="panel-predict">
+    <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.6"/><path d="M10 7v3l2 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    Predict
+  </button>
+  <button id="tab-batch" class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-batch">
+    <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="3" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="9" width="14" height="3" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="14" width="14" height="3" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+    Batch
+  </button>
+  <button id="tab-analytics" class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-analytics">
+    <svg viewBox="0 0 20 20" fill="none"><path d="M3 16l4-5 4 3 4-8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Analytics
+  </button>
+  <button id="tab-model" class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-model">
+    <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="6" height="6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="3" width="6" height="6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="11" width="6" height="6" rx="1.2" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="11" width="6" height="6" rx="1.2" stroke="currentColor" stroke-width="1.5"/></svg>
+    Model Info
+  </button>
+  <div class="tab-indicator" id="tab-indicator"></div>
+</nav>
+
+<!-- ── Panel: Predict ─────────────────────────────────────────────────────── -->
+<main id="panel-predict" class="tab-panel active layout" role="tabpanel">
+
+  <!-- Form card -->
+  <section class="card form-card" aria-labelledby="form-heading">
+    <div class="card-header">
+      <h2 id="form-heading">Student Profile</h2>
+      <span class="badge-chip" id="pred-count">0 logged</span>
+    </div>
+
+    <form id="predict-form" novalidate>
+
+      <p class="section-label">Academic Scores</p>
+      <div class="grid">
+        <label class="field">
+          <span>Gender</span>
+          <select name="gender" id="f-gender">
+            <option value="M">Male</option>
+            <option value="F">Female</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Work Experience</span>
+          <select name="workex" id="f-workex">
+            <option value="No">No</option>
+            <option value="Yes">Yes</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>SSC Board</span>
+          <select name="ssc_b" id="f-ssc_b">
+            <option value="Others">Others</option>
+            <option value="Central">Central</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>SSC Percentage</span>
+          <input type="number" name="ssc_p" id="f-ssc_p" min="0" max="100" step="0.01" required placeholder="e.g. 67" />
+        </label>
+        <label class="field">
+          <span>HSC Board</span>
+          <select name="hsc_b" id="f-hsc_b">
+            <option value="Others">Others</option>
+            <option value="Central">Central</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>HSC Stream</span>
+          <select name="hsc_s" id="f-hsc_s">
+            <option value="Commerce">Commerce</option>
+            <option value="Science">Science</option>
+            <option value="Arts">Arts</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>HSC Percentage</span>
+          <input type="number" name="hsc_p" id="f-hsc_p" min="0" max="100" step="0.01" required placeholder="e.g. 91" />
+        </label>
+        <label class="field">
+          <span>Degree Specialisation</span>
+          <select name="degree_t" id="f-degree_t">
+            <option value="Sci&amp;Tech">Science &amp; Tech</option>
+            <option value="Comm&amp;Mgmt">Commerce &amp; Mgmt</option>
+            <option value="Others">Others</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Degree Percentage</span>
+          <input type="number" name="degree_p" id="f-degree_p" min="0" max="100" step="0.01" required placeholder="e.g. 58" />
+        </label>
+        <label class="field">
+          <span>MBA Specialisation</span>
+          <select name="specialisation" id="f-specialisation">
+            <option value="Mkt&amp;HR">Mkt &amp; HR</option>
+            <option value="Mkt&amp;Fin">Mkt &amp; Fin</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>MBA Percentage</span>
+          <input type="number" name="mba_p" id="f-mba_p" min="0" max="100" step="0.01" required placeholder="e.g. 58.8" />
+        </label>
+        <label class="field">
+          <span>Employability Test %</span>
+          <input type="number" name="etest_p" id="f-etest_p" min="0" max="100" step="0.01" required placeholder="e.g. 55" />
+        </label>
+      </div>
+
+      <!-- Kumbhar optional fields -->
+      <details class="optional-section" id="optional-details">
+        <summary class="optional-toggle">
+          <svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          Skills &amp; Activity (optional — improves accuracy)
+        </summary>
+        <div class="grid optional-grid">
+          <label class="field">
+            <span>CGPA (0–10)</span>
+            <input type="number" name="cgpa" id="f-cgpa" min="0" max="10" step="0.01" placeholder="e.g. 7.8" />
+          </label>
+          <label class="field">
+            <span>Internships</span>
+            <input type="number" name="internships" id="f-internships" min="0" step="1" placeholder="e.g. 2" />
+          </label>
+          <label class="field">
+            <span>Projects</span>
+            <input type="number" name="projects" id="f-projects" min="0" step="1" placeholder="e.g. 3" />
+          </label>
+          <label class="field">
+            <span>Workshops / Certs</span>
+            <input type="number" name="workshops" id="f-workshops" min="0" step="1" placeholder="e.g. 4" />
+          </label>
+          <label class="field">
+            <span>Aptitude Score (0–100)</span>
+            <input type="number" name="aptitude_score" id="f-aptitude_score" min="0" max="100" step="0.1" placeholder="e.g. 72" />
+          </label>
+          <label class="field">
+            <span>Soft Skills (0–10)</span>
+            <input type="number" name="soft_skills" id="f-soft_skills" min="0" max="10" step="0.1" placeholder="e.g. 7.5" />
+          </label>
+        </div>
+      </details>
+
+      <div class="actions">
+        <button id="prefill" type="button" class="btn ghost">Pre-fill example</button>
+        <button id="clear" type="button" class="btn ghost">Clear</button>
+        <button id="submit" type="submit" class="btn primary">
+          <svg viewBox="0 0 20 20" fill="none"><path d="M10 3l7 7-7 7M3 10h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Predict Placement
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <!-- Result card -->
+  <section class="card result-card" id="result" hidden aria-labelledby="result-heading" aria-live="polite">
+
+    <div class="result-top">
+      <div>
+        <p class="eyebrow">Prediction</p>
+        <h2 id="prediction" class="pred-badge">—</h2>
+        <p class="note" id="prediction-note"></p>
+      </div>
+
+      <!-- Animated SVG gauge -->
+      <div class="gauge-wrap" aria-hidden="true">
+        <svg id="gauge-svg" viewBox="0 0 120 80" class="gauge-svg">
+          <path class="gauge-track" d="M10 70 A50 50 0 0 1 110 70" fill="none" stroke-width="10" stroke-linecap="round"/>
+          <path class="gauge-fill" id="gauge-arc" d="M10 70 A50 50 0 0 1 110 70" fill="none" stroke-width="10" stroke-linecap="round"/>
+          <text id="gauge-pct" x="60" y="68" text-anchor="middle" class="gauge-text">0%</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Salary badge (shown only when Placed + salary model exists) -->
+    <div class="salary-badge" id="salary-badge" hidden>
+      <span class="salary-icon">₹</span>
+      <div>
+        <span class="salary-amount" id="salary-amount">—</span>
+        <span class="salary-band" id="salary-band"></span>
+      </div>
+      <span class="salary-range" id="salary-range"></span>
+    </div>
+
+    <!-- Metric mini-cards -->
+    <div class="metrics" id="metric-cards"></div>
+
+    <!-- SHAP waterfall -->
+    <h3 class="section-label" style="margin-top:20px">Prediction Waterfall</h3>
+    <div id="waterfall" class="waterfall-host"></div>
+
+    <!-- SHAP contributors bar -->
+    <h3 class="section-label">Top Influencing Factors</h3>
+    <ul id="contributors" class="contributors" aria-label="SHAP feature contributions"></ul>
+
+    <!-- Counterfactual -->
+    <div class="cf-actions">
+      <button id="cf" type="button" class="btn ghost" disabled>
+        <svg viewBox="0 0 20 20" fill="none"><path d="M4 4h5v5M16 16h-5v-5M4 16l12-12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        Suggest changes to flip the outcome
+      </button>
+    </div>
+    <div id="cf-result" class="cf-card" hidden></div>
+  </section>
+
+</main>
+
+<!-- ── Panel: Batch ───────────────────────────────────────────────────────── -->
+<div id="panel-batch" class="tab-panel layout-single" role="tabpanel" hidden>
+  <section class="card batch-card">
+    <div class="card-header">
+      <h2>Bulk Scoring</h2>
+      <span class="note">One JSON profile per line (max 1,000)</span>
+    </div>
+    <textarea id="batch-input" rows="6" spellcheck="false" placeholder='{"gender":"M","ssc_p":67,"ssc_b":"Others","hsc_p":91,"hsc_b":"Others","hsc_s":"Commerce","degree_p":58,"degree_t":"Sci&Tech","workex":"No","etest_p":55,"specialisation":"Mkt&HR","mba_p":58.8}'></textarea>
+    <div class="actions">
+      <button id="batch-example" type="button" class="btn ghost">Insert example</button>
+      <button id="batch-run" type="button" class="btn primary">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M5 4l11 6-11 6V4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        Score Batch
+      </button>
+    </div>
+    <div id="batch-result"></div>
+  </section>
+</div>
+
+<!-- ── Panel: Analytics ───────────────────────────────────────────────────── -->
+<div id="panel-analytics" class="tab-panel layout-single" role="tabpanel" hidden>
+  <div class="analytics-grid">
+
+    <!-- Placement rate KPI cards -->
+    <section class="card kpi-row" aria-label="Key metrics">
+      <div class="kpi-card" id="kpi-total">
+        <strong>—</strong><span>Total Predictions</span>
+      </div>
+      <div class="kpi-card accent" id="kpi-rate">
+        <strong>—</strong><span>Placement Rate</span>
+      </div>
+      <div class="kpi-card" id="kpi-placed">
+        <strong>—</strong><span>Placed</span>
+      </div>
+      <div class="kpi-card danger" id="kpi-notplaced">
+        <strong>—</strong><span>Not Placed</span>
+      </div>
+    </section>
+
+    <!-- Daily placement bar chart -->
+    <section class="card" aria-labelledby="chart-heading">
+      <h2 id="chart-heading">Daily Placement Trend</h2>
+      <div id="daily-chart" class="chart-host" aria-label="Daily placement bar chart"></div>
+      <p class="note no-data-note" id="daily-note" hidden>No prediction history yet. Run some predictions first.</p>
+    </section>
+
+    <!-- SHAP feature importance chart -->
+    <section class="card" aria-labelledby="shap-heading">
+      <h2 id="shap-heading">Global Feature Importance (SHAP)</h2>
+      <div id="shap-chart" class="chart-host" aria-label="SHAP feature importance chart"></div>
+    </section>
+
+  </div>
+</div>
+
+<!-- ── Panel: Model Info ─────────────────────────────────────────────────── -->
+<div id="panel-model" class="tab-panel layout-single" role="tabpanel" hidden>
+  <div class="model-grid">
+
+    <!-- Model comparison table -->
+    <section class="card" aria-labelledby="comparison-heading">
+      <h2 id="comparison-heading">Model Comparison (CV ROC-AUC)</h2>
+      <div id="comparison-table" class="table-host"></div>
+    </section>
+
+    <!-- Learning curve -->
+    <section class="card" aria-labelledby="lc-heading">
+      <h2 id="lc-heading">Learning Curve</h2>
+      <div id="learning-curve-chart" class="chart-host" aria-label="Learning curve chart"></div>
+    </section>
+
+    <!-- Run history -->
+    <section class="card" aria-labelledby="runs-heading">
+      <h2 id="runs-heading">Experiment History</h2>
+      <div id="runs-table" class="table-host"></div>
+    </section>
+
+  </div>
+</div>
+
+<!-- ── Footer ────────────────────────────────────────────────────────────── -->
+<footer>
+  <div class="drift-line" id="drift-line"></div>
+  <p class="footer-note">
+    PlaceIQ · scikit-learn, XGBoost, Optuna, SHAP &amp; FastAPI ·
+    <a href="/docs" target="_blank" rel="noopener">API docs</a>
+  </p>
+</footer>
+
+<div id="error-toast" class="toast" hidden role="alert" aria-live="assertive"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
