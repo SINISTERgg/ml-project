@@ -25,9 +25,9 @@ import streamlit as st
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src import config          # noqa: E402  — sys.path must precede src imports
-from src.predict import Predictor  # noqa: E402
-from src.salary import load_salary_predictor  # noqa: E402
+from src import config
+from src.predict import Predictor
+from src.salary import load_salary_predictor
 
 st.set_page_config(
     page_title="PlaceIQ — Student Placement Predictor",
@@ -52,7 +52,7 @@ try:
     if predictor is None:
         st.error("Train a model first:  python scripts/train_all.py")
         st.stop()
-except Exception as exc:  # pragma: no cover
+except (OSError, ValueError, RuntimeError, AttributeError) as exc:  # pragma: no cover
     st.error(f"Could not load model: {exc}")
     st.info("Run `python scripts/train_all.py`, then re-open this app.")
     st.stop()
@@ -153,8 +153,8 @@ def render_gauge(probability: float, label: str) -> None:
             },
         },
     ))
-    fig.update_layout(height=280, margin=dict(l=30, r=30, t=60, b=10))
-    st.plotly_chart(fig, use_container_width=True)
+    fig.update_layout(height=280, margin={"l": 30, "r": 30, "t": 60, "b": 10})
+    st.plotly_chart(fig, width="stretch")
 
 
 def render_contributors(contributors: list) -> None:
@@ -174,8 +174,8 @@ def render_contributors(contributors: list) -> None:
         labels={"shap": "SHAP contribution", "feature": ""},
         title="Feature contributions to the prediction",
     )
-    fig.update_layout(height=max(320, 42 * len(rows)), margin=dict(l=10, r=10, t=50, b=10))
-    st.plotly_chart(fig, use_container_width=True)
+    fig.update_layout(height=max(320, 42 * len(rows)), margin={"l": 10, "r": 10, "t": 50, "b": 10})
+    st.plotly_chart(fig, width="stretch")
 
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -201,7 +201,7 @@ if tab == "Predict":
     with col_form:
         inputs = build_form_inputs()
 
-        if st.button("Predict Placement", type="primary", use_container_width=True):
+        if st.button("Predict Placement", type="primary", width="stretch"):
             try:
                 result = predictor.predict(inputs)
             except Exception as exc:
@@ -288,7 +288,7 @@ elif tab == "Batch Scoring":
         st.success(f"Scored {len(out)} students — "
                    f"{(out['prediction'] == 'Placed').sum()} placed, "
                    f"{(out['prediction'] != 'Placed').sum()} not placed.")
-        st.dataframe(out, use_container_width=True)
+        st.dataframe(out, width="stretch")
 
 # ── Tab: Model info + EDA ─────────────────────────────────────────────────────
 else:
@@ -300,7 +300,7 @@ else:
         comp_path = config.CV_COMPARISON_PATH
         if comp_path.exists():
             comp = pd.read_csv(comp_path)
-            st.dataframe(comp.round(4), use_container_width=True)
+            st.dataframe(comp.round(4), width="stretch")
         else:
             st.caption("No comparison saved. Run training first.")
 
@@ -331,9 +331,9 @@ else:
                                      name="Training score", mode="lines+markers"))
             fig.add_trace(go.Scatter(x=lc["train_sizes"], y=lc["cv"],
                                      name="Cross-validation score", mode="lines+markers"))
-            fig.update_layout(height=320, margin=dict(l=10, r=10, t=30, b=10),
+            fig.update_layout(height=320, margin={"l": 10, "r": 10, "t": 30, "b": 10},
                               yaxis_title="Accuracy (CV)", xaxis_title="Training examples")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
     with tab_c:
         st.subheader("EDA visualisations (Phase 1)")
@@ -356,7 +356,7 @@ else:
                 row = st.columns(2)
                 for col, f in zip(row, files[idx:idx + 2]):
                     col.image(str(f), caption=captions.get(f.name, f.stem),
-                              use_container_width=True)
+                              width="stretch")
 
 st.divider()
 st.caption("PlaceIQ · CIE ML project · run "

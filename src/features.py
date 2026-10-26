@@ -8,7 +8,6 @@ engineered activity/skills features fall back to 0.
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
@@ -53,8 +52,12 @@ def add_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
 
     # ── skills_composite: combined aptitude + soft-skills (0-100 scale) ─────
     if "aptitude_score" in df.columns and "soft_skills" in df.columns:
-        apt = df["aptitude_score"].fillna(df["aptitude_score"].median())
-        ss = df["soft_skills"].fillna(df["soft_skills"].median()) * 10   # 0-10 → 0-100
+        apt_col = df["aptitude_score"]
+        ss_col = df["soft_skills"]
+        apt_med = float(apt_col.median()) if apt_col.notna().any() else 0.0
+        ss_med = float(ss_col.median()) if ss_col.notna().any() else 0.0
+        apt = apt_col.fillna(apt_med)
+        ss = ss_col.fillna(ss_med) * 10   # 0-10 → 0-100
         df["skills_composite"] = (apt + ss) / 2
     elif "aptitude_score" in df.columns:
         df["skills_composite"] = df["aptitude_score"].fillna(0)
@@ -105,3 +108,4 @@ def build_preprocessor(available_columns: list[str] | None = None) -> ColumnTran
 def feature_names(preprocessor: ColumnTransformer) -> list[str]:
     """Return flattened output feature names from a fitted ColumnTransformer."""
     return list(preprocessor.get_feature_names_out())
+

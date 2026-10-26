@@ -7,13 +7,11 @@ The model is mocked so tests run without a trained bundle.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-
 
 # ── Helpers to build a minimal mock predictor ────────────────────────────────
 

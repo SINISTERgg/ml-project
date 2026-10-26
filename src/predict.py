@@ -94,7 +94,12 @@ class Predictor:
             response["explanation_model"] = self.bundle.get("surrogate_name")
 
         shap_values = compute_shap_values(self.explainer, Xt)
-        flat = np.asarray(shap_values).reshape(-1)
+        shap_arr = np.asarray(shap_values)
+        if isinstance(shap_values, list) and len(shap_values) == 2:
+            shap_arr = np.asarray(shap_values[1])
+        elif shap_arr.ndim == 3 and shap_arr.shape[-1] >= 2:
+            shap_arr = shap_arr[:, :, 1]
+        flat = np.asarray(shap_arr).reshape(-1)
         contributors = [
             {"feature": pretty_name(n), "value": float(v), "shap": float(s)}
             for n, v, s in zip(self.bundle["feature_names"], Xt[0], flat)
@@ -102,8 +107,12 @@ class Predictor:
         contributors.sort(key=lambda c: abs(c["shap"]), reverse=True)
         response["contributors"] = contributors[:12]
 
-        base_prob = self.explainer_info.get("expected_value")
+        base_prob = self.explainer_info.get("base_probability")
+        if base_prob is None:
+            base_prob = self.explainer_info.get("expected_value")
         if base_prob is not None:
             base_prob = float(base_prob)
-            response["base_probability"] = round(1 / (1 + np.exp(-base_prob)), 4)
+            if not 0.0 <= base_prob <= 1.0:
+                base_prob = float(1.0 / (1.0 + np.exp(-base_prob)))
+            response["base_probability"] = round(base_prob, 4)
         return response

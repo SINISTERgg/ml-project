@@ -1,8 +1,6 @@
 """test_features.py — unit tests for src/features.py"""
 
-import numpy as np
 import pandas as pd
-import pytest
 
 from src.features import add_feature_engineering, build_preprocessor, feature_names
 

@@ -1,24 +1,27 @@
-from imblearn.pipeline import Pipeline as ImbPipeline
 import numpy as np
 from sklearn.calibration import CalibratedClassifierCV
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier, StackingClassifier, VotingClassifier
+from sklearn.ensemble import StackingClassifier, VotingClassifier
 from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import brier_score_loss
-from sklearn.model_selection import StratifiedKFold, cross_val_score, RepeatedStratifiedKFold
+from sklearn.model_selection import (
+    RepeatedStratifiedKFold,
+    StratifiedKFold,
+    cross_val_predict,
+    cross_validate,
+)
 from sklearn.svm import SVC
-from xgboost import XGBClassifier
 
 from . import config
 from .tuning import build_raw, with_smote
 
 
-def single_estimator(algo, params, settings, scale_pos_weight=1.0):
+def single_estimator(algo, params, settings, scale_pos_weight=1.0, categorical_indices=None):
     raw = build_raw(algo, params, scale_pos_weight)
-    return with_smote(raw, settings.use_smote)
+    return with_smote(raw, settings.use_smote, categorical_indices)
 
 
-def _probable_single(algo, params, settings, scale_pos_weight=1.0):
+def _probable_single(algo, params, settings, scale_pos_weight=1.0, categorical_indices=None):
     raw = build_raw(algo, params, scale_pos_weight)
     if algo == "svc":
         estimator = CalibratedClassifierCV(
@@ -28,28 +31,38 @@ def _probable_single(algo, params, settings, scale_pos_weight=1.0):
         )
     else:
         estimator = raw
-    return with_smote(estimator, settings.use_smote)
+    return with_smote(estimator, settings.use_smote, categorical_indices)
 
 
-def build_candidates(algo_params, settings, scale_pos_weight=1.0):
+def build_candidates(algo_params, settings, scale_pos_weight=1.0, categorical_indices=None):
     candidates = {}
     for algo, params in algo_params.items():
         display = config.MODEL_NAMES[algo]
         candidates[display] = {
-            "estimator": _probable_single(algo, params, settings, scale_pos_weight),
+            "estimator": _probable_single(
+                algo, params, settings, scale_pos_weight, categorical_indices
+            ),
             "tuned_params": params,
         }
 
     stackers = [a for a in settings.stackers if a in algo_params]
     if settings.use_voting and len(stackers) >= 2:
-        estimators = [(a, _probable_single(a, algo_params[a], settings, scale_pos_weight)) for a in stackers]
+        estimators = [
+            (a, _probable_single(a, algo_params[a], settings, scale_pos_weight,
+                                 categorical_indices))
+            for a in stackers
+        ]
         candidates[config.MODEL_NAMES["voting"]] = {
             "estimator": VotingClassifier(estimators=estimators, voting="soft"),
             "tuned_params": None,
         }
 
     if settings.use_stacking and len(stackers) >= 2:
-        estimators = [(a, _probable_single(a, algo_params[a], settings, scale_pos_weight)) for a in stackers]
+        estimators = [
+            (a, _probable_single(a, algo_params[a], settings, scale_pos_weight,
+                                 categorical_indices))
+            for a in stackers
+        ]
         meta = LogisticRegression(max_iter=2000, class_weight="balanced",
                                   random_state=config.RANDOM_STATE)
         cv = StratifiedKFold(5, shuffle=True, random_state=config.RANDOM_STATE)
@@ -62,15 +75,32 @@ def build_candidates(algo_params, settings, scale_pos_weight=1.0):
 
 
 def compare_candidates(candidates, X, y, settings):
+    """Benchmark every candidate with repeated stratified CV.
+
+    Models are compared on ROC-AUC, F1 and Brier score so that ranking is not
+    driven by a single threshold-sensitive metric.
+    """
     cv = RepeatedStratifiedKFold(
         n_splits=settings.cv_splits, n_repeats=settings.n_repeats,
         random_state=config.RANDOM_STATE,
     )
+    scoring = {"roc_auc": "roc_auc", "f1": "f1", "brier": "neg_brier_score"}
     rows = []
     for name, entry in candidates.items():
-        scores = cross_val_score(entry["estimator"], X, y, cv=cv, scoring="roc_auc", n_jobs=-1)
-        rows.append({"model": name, "cv_roc_auc_mean": float(scores.mean()),
-                     "cv_roc_auc_std": float(scores.std())})
+        result = cross_validate(
+            entry["estimator"], X, y, cv=cv, scoring=scoring, n_jobs=-1
+        )
+        # neg_brier_score is returned as a negative value; flip for reporting.
+        brier = -result["test_brier"]
+        rows.append({
+            "model": name,
+            "cv_roc_auc_mean": float(result["test_roc_auc"].mean()),
+            "cv_roc_auc_std": float(result["test_roc_auc"].std()),
+            "cv_f1_mean": float(result["test_f1"].mean()),
+            "cv_f1_std": float(result["test_f1"].std()),
+            "cv_brier_mean": float(brier.mean()),
+            "cv_brier_std": float(brier.std()),
+        })
     return rows
 
 
@@ -91,7 +121,17 @@ class ProbaCalibrator:
 
 
 def calibrate(base_estimator, methods, X_cal, y_cal, X_val, y_val):
-    cal_proba = np.asarray(base_estimator.predict_proba(X_cal))[:, 1]
+    """Fit calibrators on out-of-fold probabilities.
+
+    Fitting a calibrator on in-sample predictions of the already-trained model
+    produces overconfident maps.  ``cross_val_predict`` generates honest
+    out-of-fold probabilities; the calibration curve is then fitted on those
+    and scored on the held-out validation split.
+    """
+    cv = StratifiedKFold(5, shuffle=True, random_state=config.RANDOM_STATE)
+    cal_proba = cross_val_predict(
+        base_estimator, X_cal, y_cal, cv=cv, method="predict_proba", n_jobs=-1
+    )[:, 1]
     val_proba = np.asarray(base_estimator.predict_proba(X_val))[:, 1]
 
     results = {"none": float(brier_score_loss(y_val, val_proba))}
@@ -100,7 +140,9 @@ def calibrate(base_estimator, methods, X_cal, y_cal, X_val, y_val):
     for method in methods:
         try:
             if method == "sigmoid":
-                mapping = LogisticRegression(max_iter=2000).fit(cal_proba.reshape(-1, 1), y_cal)
+                mapping = LogisticRegression(max_iter=2000).fit(
+                    cal_proba.reshape(-1, 1), y_cal
+                )
                 fitted = mapping.predict_proba(val_proba.reshape(-1, 1))[:, 1]
                 calibrator = ProbaCalibrator(base_estimator, mapping, "sigmoid")
             else:

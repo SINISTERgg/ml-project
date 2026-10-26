@@ -59,7 +59,7 @@ datasets on Kaggle) confirms these variables carry strong signal. This is a stan
 5. Evaluate rigorously (ROC-AUC, precision/recall/F1, calibration) and **interpret** results.
 6. Deploy a **working web application** (Streamlit) and publish the code to a **public GitHub repository**.
 
-**Baseline & success criterion:** ROC-AUC ≥ 0.85 on held-out test data (achieved **0.91**).
+**Baseline & success criterion:** ROC-AUC ≥ 0.85 on held-out test data (achieved **0.913**).
 
 ---
 
@@ -186,9 +186,9 @@ experimentation (all pipelines = `preprocessor → model`, 5-fold CV):
 
 | Model | CV ROC-AUC (initial) | Role in Phase 1 |
 |---|---|---|
-| Logistic Regression | 0.935 | linear baseline + interpretability |
-| SVC (RBF) | 0.928 | non-linear baseline |
-| Random Forest | 0.920 | ensemble baseline, robustness |
+| Logistic Regression | 0.945 | linear baseline + interpretability |
+| SVC (RBF) | 0.948 | non-linear baseline |
+| Random Forest | 0.918 | ensemble baseline, robustness |
 
 These prove the premise: even simple models already exceed the **0.85 benchmark**,
 so the remaining weeks focus on squeezing performance with more models, tuning,
@@ -224,15 +224,17 @@ Five candidate classifiers wrapped in identical pipelines in `src/ensemble.py`:
 
 | Model | CV ROC-AUC (mean) | Std |
 |---|---|---|
-| **Logistic Regression** | **0.935** | 0.034 |
-| SVC | 0.928 | 0.031 |
-| Random Forest | 0.920 | 0.044 |
-| XGBoost | 0.915 | 0.053 |
-| Gradient Boosting | 0.890 | 0.067 |
+| **SVC** | **0.948** | 0.034 |
+| Logistic Regression | 0.945 | 0.037 |
+| XGBoost | 0.928 | 0.045 |
+| Stacking Ensemble | 0.927 | 0.054 |
+| Voting Ensemble | 0.927 | 0.054 |
+| Gradient Boosting | 0.925 | 0.058 |
+| Random Forest | 0.918 | 0.055 |
 
-Voting and Stacking ensembles were also explored. Logistic Regression, XGBoost and
-Gradient Boosting were the strongest three; LR wins on CV stability and
-interpretability, so it is carried forward to tuning.
+Voting and Stacking ensembles were also explored. SVC, Logistic Regression and XGBoost
+were the strongest three; SVC wins on CV stability (0.948, std 0.034) and carries
+forward to evaluation.
 
 ---
 
@@ -244,20 +246,23 @@ interpretability, so it is carried forward to tuning.
 
 | Model | Tuned space | Best found |
 |---|---|---|
-| Logistic | `C ∈ log(1e-3, 1e3)` | `C = 6.21` |
-| RandomForest | `n_estimators, max_depth, min_samples_leaf, max_features` | `600, 8, 1, "log2"` |
-| GradientBoosting | `lr, n_estimators, max_depth, subsample` | `0.057, 52, 5, 0.67` |
-| XGBoost | `lr, n_estimators, depth, subsample, colsample, λ` | `0.13, 230, 4, 0.71, 0.72, 2.1` |
-| SVC | `C, gamma` | `C=266, γ=0.002` |
+| Logistic | `C ∈ log(1e-3, 1e3)` | `C = 5.28` |
+| RandomForest | `n_estimators, max_depth, min_samples_leaf, max_features` | `600, 10, 1, "sqrt"` |
+| GradientBoosting | `lr, n_estimators, max_depth, subsample` | `0.219, 213, 2, 0.998` |
+| XGBoost | `lr, n_estimators, depth, subsample, colsample, λ` | `0.049, 258, 6, 0.761, 0.638, 0.21` |
+| SVC | `C, gamma` | `C=164.3, γ=0.0018` |
 
 **Post-tuning steps** (this is why the final model is "tuned"):
-1. **Calibration** — Isotonic vs Sigmoid compared by Brier score; **Sigmoid** chosen.
-2. **Threshold optimisation** — decision cut-off moved from 0.5 → **0.81** to maximise F1
-   on validation, making the classifier deliberately conservative.
+1. **Calibration** — Isotonic vs Sigmoid compared by Brier score; none of them improved
+   the raw SVC probabilities sufficiently, so **no calibration was applied**.
+2. **Threshold optimisation** — decision cut-off moved from 0.5 to **0.553** to maximise F1
+   on validation, making the classifier slightly more selective.
 
-**Selected final model:** tuned + calibrated **Logistic Regression** (champion,
-auto-promoted via `models/champion.json`; a salary regressor — XGBRegressor — is
-attached for placed students).
+**Selected final model:** tuned **SVC** (champion, auto-promoted via
+`models/champion.json`). Because SVC with an RBF kernel cannot produce exact SHAP
+attributions, explanations are delivered through an **XGBoost surrogate** (best
+SHAP-compatible single model, CV ROC-AUC 0.928). A salary regressor (XGBRegressor)
+is attached for placed students.
 
 ---
 
@@ -269,30 +274,30 @@ attached for placed students).
 
 | Metric | Value | Interpretation |
 |---|---|---|
-| Accuracy | 0.744 | 74.4% of test students classified correctly |
-| Precision | 0.952 | when the model says "Placed", it is right 95% of the time |
-| Recall | 0.667 | captures 2/3 of actually-placed students |
-| F1-score | 0.784 | balanced precision/recall score |
-| **ROC-AUC** | **0.908** | excellent rank separation — **above the 0.85 benchmark** |
-| PR-AUC | 0.960 | strong precision across the whole recall range |
-| Brier score | 0.127 | probabilities are well calibrated (0 = perfect) |
-| Decision threshold | 0.81 | tuned on validation for F1 |
+| Accuracy | 0.837 | 83.7% of test students classified correctly |
+| Precision | 0.960 | when the model says "Placed", it is right 96% of the time |
+| Recall | 0.800 | captures 80% of actually-placed students |
+| F1-score | 0.873 | balanced precision/recall score |
+| **ROC-AUC** | **0.913** | excellent rank separation — **above the 0.85 benchmark** |
+| PR-AUC | 0.962 | strong precision across the whole recall range |
+| Brier score | 0.135 | probabilities are well calibrated (0 = perfect) |
+| Decision threshold | 0.553 | tuned on validation for F1 |
 
 ### 8.2 Error analysis + model diagnostics (plots in `models/plots/`)
 
 - **Confusion matrix** — errors concentrate as false *negatives* on placed students:
-  the tuned threshold trades minor recall for very high precision (the cost of
-  wrongly promising a placement is higher for students).
+  the model trades minor recall (0.80) for very high precision (0.96); the cost of
+  wrongly promising a placement is higher for students, so this trade-off is deliberate.
 - **ROC / PR curves** — area well above baseline; PR curve is close to ideal,
   confirming reliability under class imbalance.
-- **Calibration plot** — after Sigmoid calibration, predicted probabilities track
-  empirical placement rates closely (Brier 0.127).
-- **Learning curve** — training score ≈ 0.98 vs CV ≈ 0.94 as sample size grows:
+- **Calibration** — probabilities track empirical placement rates; Brier 0.135 is low
+  enough to trust the model's confidence score directly.
+- **Learning curve** — training score is high vs CV as sample size grows:
   low variance, no overfitting; the model is limited by data size (215 rows), not
   capacity.
-- **SHAP analysis** (interpretation) — top contributors: `etest_p`, `mba_p`,
-  `degree_p`, `workex_Yes`. Meaning: employability test score and work experience
-  dominate placement odds; the UI surfaces these per student.
+- **SHAP analysis** (XGBoost surrogate, interpretability) — top contributors: `etest_p`,
+  `mba_p`, `degree_p`, `workex_Yes`. Meaning: employability test score and work
+  experience dominate placement odds; the UI surfaces these per student.
 
 ### 8.3 Why these metrics (viva-ready answers)
 

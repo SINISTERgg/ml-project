@@ -37,8 +37,8 @@ services:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 10s
+      retries: 5
+      start_period: 15s
 
   # ── Model trainer (one-shot: runs train.py if model is absent) ───────────
   trainer:

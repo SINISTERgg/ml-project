@@ -1,6 +1,7 @@
 import json
-from typing import List, Literal, Optional
+from typing import Literal
 
+import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +13,6 @@ from src import config, experiments, monitor
 from src.counterfactual import suggest
 from src.predict import Predictor
 from src.salary import load_salary_predictor
-from src.settings import DEFAULT_CATEGORY_OPTIONS
 
 # ── App init ──────────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -40,7 +40,7 @@ app.mount("/plots", StaticFiles(directory=str(config.PLOTS_DIR)), name="plots")
 def _load_predictor():
     try:
         return Predictor()
-    except Exception as exc:
+    except (OSError, FileNotFoundError, ValueError, RuntimeError, AttributeError) as exc:
         print(f"Classification model not ready: {exc}")
         return None
 
@@ -48,7 +48,7 @@ def _load_predictor():
 def _load_salary():
     try:
         return load_salary_predictor()
-    except Exception as exc:
+    except (OSError, FileNotFoundError, ValueError, RuntimeError, AttributeError) as exc:
         print(f"Salary model not ready: {exc}")
         return None
 
@@ -64,6 +64,38 @@ def require_model():
             detail="Model not trained yet. Run `python -m src.train` first.",
         )
     return predictor
+
+
+@app.get("/api/ready")
+def ready():
+    global salary_predictor
+    model = predictor
+    if model is None:
+        raise HTTPException(status_code=503, detail="Model not ready")
+    if salary_predictor is None and config.SALARY_BUNDLE_PATH.exists():
+        try:
+            from src.salary import load_salary_predictor
+
+            salary_predictor = load_salary_predictor()
+        except (OSError, ValueError, RuntimeError, AttributeError):
+            pass
+    return {"status": "ready", "model": model.model_name, "run_id": model.run_id}
+
+
+@app.post("/api/admin/reload")
+def admin_reload():
+    global predictor, salary_predictor
+    try:
+        predictor = Predictor()
+    except (OSError, FileNotFoundError, ValueError, RuntimeError, AttributeError) as exc:
+        raise HTTPException(status_code=503, detail=f"Reload failed: {exc}") from exc
+    try:
+        from src.salary import load_salary_predictor
+
+        salary_predictor = load_salary_predictor()
+    except (OSError, FileNotFoundError, ValueError, RuntimeError, AttributeError):
+        salary_predictor = None
+    return {"status": "reloaded", "model": predictor.model_name, "run_id": predictor.run_id}
 
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
@@ -94,20 +126,20 @@ class PlacementInput(BaseModel):
     specialisation: Literal["Mkt&Fin", "Mkt&HR"]
     mba_p: float = Field(ge=0, le=100)
     # Kumbhar features (optional — improves predictions when present)
-    cgpa: Optional[float] = Field(default=None, ge=0, le=10)
-    internships: Optional[int] = Field(default=None, ge=0)
-    projects: Optional[int] = Field(default=None, ge=0)
-    workshops: Optional[int] = Field(default=None, ge=0)
-    aptitude_score: Optional[float] = Field(default=None, ge=0, le=100)
-    soft_skills: Optional[float] = Field(default=None, ge=0, le=10)
+    cgpa: float | None = Field(default=None, ge=0, le=10)
+    internships: int | None = Field(default=None, ge=0)
+    projects: int | None = Field(default=None, ge=0)
+    workshops: int | None = Field(default=None, ge=0)
+    aptitude_score: float | None = Field(default=None, ge=0, le=100)
+    soft_skills: float | None = Field(default=None, ge=0, le=10)
 
 
 class BatchRequest(BaseModel):
-    items: List[PlacementInput] = Field(min_length=1, max_length=1000)
+    items: list[PlacementInput] = Field(min_length=1, max_length=1000)
 
 
 class CounterfactualRequest(PlacementInput):
-    target: Optional[Literal["Placed", "Not Placed"]] = None
+    target: Literal["Placed", "Not Placed"] | None = None
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -119,7 +151,10 @@ def index():
 
 @app.get("/api/health")
 def health():
-    model = require_model()
+    model = predictor
+    if model is None:
+        return {"status": "unavailable", "model": None, "run_id": None,
+                "salary_model": False, "predictions_logged": _log_count()}
     return {
         "status": "ok",
         "model": model.model_name,
@@ -138,8 +173,8 @@ def model_meta():
     if config.META_PATH.exists():
         try:
             meta = json.loads(config.META_PATH.read_text())
-        except Exception:
-            pass
+        except (OSError, json.JSONDecodeError):
+            meta = None
     return {
         "model": model.model_name,
         "run_id": model.run_id,
@@ -185,7 +220,7 @@ def predict(payload: PlacementInput):
         response = model.predict(raw)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    except Exception as exc:
+    except (RuntimeError, AttributeError) as exc:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {exc}")
 
     # Augment with salary estimate when student is predicted placed
@@ -193,8 +228,8 @@ def predict(payload: PlacementInput):
         try:
             salary_info = salary_predictor.predict(raw)
             response.update(salary_info)
-        except Exception as exc:
-            response["salary_note"] = f"Salary estimate unavailable: {exc}"
+        except (RuntimeError, AttributeError, ValueError):
+            response["salary_note"] = "Salary estimate unavailable"
 
     monitor.log_prediction(raw, response)
     return response
@@ -218,7 +253,8 @@ def predict_batch(batch: BatchRequest):
                 salary_info = salary_predictor.predict(payload)
                 item_result["salary_band"] = salary_info.get("salary_band")
                 item_result["salary_estimate"] = salary_info.get("salary_estimate")
-            except Exception:
+                item_result["salary_range"] = salary_info.get("salary_range")
+            except (RuntimeError, AttributeError, ValueError):
                 pass
         monitor.log_prediction(payload, {
             "model": model.model_name, "run_id": model.run_id,
@@ -245,8 +281,8 @@ def counterfactual(payload: CounterfactualRequest):
     target = payload.target or ("Not Placed" if pred == "Placed" else "Placed")
     try:
         return suggest(model, raw, target=target, max_edits=6)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Counterfactual search failed: {exc}")
+    except (RuntimeError, AttributeError, ValueError) as exc:
+        raise HTTPException(status_code=500, detail=f"Counterfactual search failed: {exc}") from exc
 
 
 @app.get("/api/admin/analytics")
@@ -305,10 +341,17 @@ def analytics(window: int = Query(default=500, ge=1, le=100000)):
     top_shap: list[dict] = []
     if config.SHAP_VALUES_PATH.exists() and config.BUNDLE_PATH.exists():
         try:
-            shap_vals = __import__("numpy").load(config.SHAP_VALUES_PATH)
-            bundle = __import__("joblib").load(config.BUNDLE_PATH)
+            shap_vals = np.load(config.SHAP_VALUES_PATH)
+            import joblib
+
+            bundle = joblib.load(config.BUNDLE_PATH)
             names = bundle.get("feature_names", [])
-            mean_abs = __import__("numpy").abs(shap_vals).mean(axis=0).ravel()
+            if isinstance(shap_vals, list) and len(shap_vals) == 2:
+                shap_vals = shap_vals[1]
+            shap_arr = np.asarray(shap_vals)
+            if shap_arr.ndim == 3 and shap_arr.shape[-1] > 1:
+                shap_arr = shap_arr[:, :, 1]
+            mean_abs = np.abs(shap_arr).mean(axis=0).ravel()
             if len(names) == len(mean_abs):
                 pairs = sorted(
                     zip(names, mean_abs.tolist()), key=lambda x: x[1], reverse=True
@@ -317,7 +360,7 @@ def analytics(window: int = Query(default=500, ge=1, le=100000)):
                     {"feature": n.split("__")[-1].replace("_", " ").title(), "importance": round(v, 5)}
                     for n, v in pairs[:12]
                 ]
-        except Exception:
+        except (OSError, ValueError, RuntimeError, AttributeError):
             pass
 
     return {

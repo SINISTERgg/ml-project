@@ -1,8 +1,8 @@
 {
-  "run_id": "20260911-110934-logisticregression",
-  "model_name": "LogisticRegression",
+  "run_id": "20260915-193804-svc",
+  "model_name": "SVC",
   "bundle_path": "C:\\Users\\M S\\Desktop\\ml project\\models\\bundle.joblib",
   "explainer_path": "C:\\Users\\M S\\Desktop\\ml project\\models\\shap_explainer.joblib",
   "explainer_info": "C:\\Users\\M S\\Desktop\\ml project\\models\\champion_explainer_info.json",
-  "updated_at": "2026-09-11T05:39:36.511355+00:00"
+  "updated_at": "2026-09-15T14:08:05.837680+00:00"
 }

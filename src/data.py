@@ -13,11 +13,10 @@ cached as `data/placement_merged.csv` for faster subsequent loads.
 
 from __future__ import annotations
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 from . import config
-
 
 # ── Target normalisation ──────────────────────────────────────────────────────
 
@@ -152,11 +151,9 @@ def merge_datasets(ben: pd.DataFrame, kumbhar: pd.DataFrame) -> pd.DataFrame:
     kum_aligned = kumbhar.reindex(columns=all_cols)
     merged = pd.concat([ben_aligned, kum_aligned], ignore_index=True)
 
-    # Fill remaining NaN in percentage columns with column medians
-    for col in config.BENROSHAN_NUMERIC:
-        if merged[col].isna().any():
-            merged[col] = merged[col].fillna(merged[col].median())
-
+    # Missing values are intentionally left untouched here.  Imputation is
+    # fitted inside the sklearn pipeline on X_train only (see features.py),
+    # which prevents validation/test information from leaking into training.
     return merged
 
 
@@ -185,7 +182,7 @@ def load_data(force_reload: bool = False) -> pd.DataFrame:
         kum = load_kumbhar()
         df = merge_datasets(ben, kum)
         df.to_csv(config.DATA_PATH, index=False)
-        print(f"  Merged → {len(df)} rows, cached to {config.DATA_PATH}")
+        print(f"  Merged -> {len(df)} rows, cached to {config.DATA_PATH}")
     elif ben_available:
         print("Loading Ben Roshan dataset only (Kumbhar not found)…")
         df = load_benroshan()

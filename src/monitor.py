@@ -1,4 +1,7 @@
 import json
+import os
+import threading
+from contextlib import contextmanager
 from datetime import datetime, timezone
 
 import numpy as np
@@ -7,14 +10,56 @@ import pandas as pd
 from . import config
 
 EPS = 1e-6
+_THREAD_LOCK = threading.Lock()
+
+
+@contextmanager
+def _file_lock(path):
+    """Cross-platform advisory file lock for append-only prediction logs."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    with _THREAD_LOCK:
+        handle = open(lock_path, "a+b")
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                handle.seek(0, os.SEEK_END)
+                if handle.tell() == 0:
+                    handle.write(b"\0")
+                    handle.flush()
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            yield
+        finally:
+            try:
+                if os.name == "nt":
+                    import msvcrt
+
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                pass
+            handle.close()
 
 
 def _numeric_reference(series, bins=8):
     q = np.linspace(0, 1, bins + 1)
-    edges = np.unique(np.quantile(series.dropna(), q))
+    non_null = series.dropna()
+    if len(non_null) == 0:
+        return None
+    edges = np.unique(np.quantile(non_null, q))
     if len(edges) < 2:
-        edges = np.array([float(series.min()) - 1, float(series.max()) + 1])
-    counts, _ = np.histogram(series.dropna(), bins=edges)
+        edges = np.array([float(non_null.min()) - 1, float(non_null.max()) + 1])
+    counts, _ = np.histogram(non_null, bins=edges)
     return {"type": "numeric", "edges": edges.tolist(), "counts": counts.tolist()}
 
 
@@ -29,7 +74,8 @@ def build_reference(df):
         if col not in df.columns:
             continue
         reference = _numeric_reference(df[col]) if col in config.NUMERIC_FEATURES else _categorical_reference(df[col])
-        ref[col] = reference
+        if reference is not None:
+            ref[col] = reference
     return ref
 
 
@@ -94,7 +140,7 @@ def drift_report(recent_df, reference=None):
     features.sort(key=lambda f: f["psi"], reverse=True)
     return {
         "available": True,
-        "n_samples": int(len(recent_df)),
+        "n_samples": len(recent_df),
         "features": features,
         "alerts": [f["feature"] for f in features if f["severity"] == "high"],
     }
@@ -109,16 +155,20 @@ def log_prediction(payload, response):
         "prediction": response.get("prediction"),
         "probability": response.get("probability"),
     }
-    with open(config.PREDICTION_LOG_PATH, "a", encoding="utf-8") as fh:
-        fh.write(json.dumps(row) + "\n")
+    with _file_lock(config.PREDICTION_LOG_PATH):
+        with open(config.PREDICTION_LOG_PATH, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(row) + "\n")
 
 
 def load_recent(window=config.DRIFT_WINDOW):
     if not config.PREDICTION_LOG_PATH.exists():
         return pd.DataFrame()
-    lines = [json.loads(l) for l in config.PREDICTION_LOG_PATH.read_text(encoding="utf-8").splitlines() if l.strip()]
+    with _file_lock(config.PREDICTION_LOG_PATH):
+        text = config.PREDICTION_LOG_PATH.read_text(encoding="utf-8")
+    lines = [json.loads(line) for line in text.splitlines() if line.strip()]
     if not lines:
         return pd.DataFrame()
     df = pd.DataFrame(lines)
     payloads = pd.json_normalize(list(df["payload"]))
     return payloads.tail(window)
+

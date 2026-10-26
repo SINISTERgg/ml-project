@@ -15,6 +15,7 @@ from .eval import (
     pick_threshold,
     plot_calibration,
     plot_confusion,
+    plot_importance_comparison,
     plot_learning_curve,
     plot_permutation_importance,
     plot_pr,
@@ -22,7 +23,7 @@ from .eval import (
     report_table,
 )
 from .features import add_feature_engineering, build_preprocessor, feature_names
-from .interpret import explain_and_save, unwrap
+from .interpret import explain_and_save, shap_compatible, unwrap
 from .monitor import save_reference
 from .salary import train_salary_model
 from .settings import TrainSettings
@@ -83,11 +84,16 @@ def main():
     )
 
     # ── Preprocessing ─────────────────────────────────────────────────────────
-    preprocessor = build_preprocessor(list(X_engineered.columns))
+    # Only pass numeric columns that actually contain observations (Kumbhar
+    # columns are all-NaN on the Ben Roshan set and must not enter the imputer).
+    preprocessor = build_preprocessor(available_numeric)
     X_train_t = preprocessor.fit_transform(X_train)
     X_val_t = preprocessor.transform(X_val)
     X_test_t = preprocessor.transform(X_test)
     names = feature_names(preprocessor)
+    # One-hot columns are indices 0..n-1 after the ColumnTransformer; SMOTENC
+    # needs to know which transformed columns are categorical.
+    categorical_indices = [i for i, name in enumerate(names) if name.startswith("cat__")]
 
     neg = int((y_train == 0).sum())
     pos = int((y_train == 1).sum())
@@ -99,19 +105,26 @@ def main():
     print("\nOptuna hyperparameter tuning:")
     algo_params = {}
     study_scores = {}
+    study_importances = {}
     for algo in settings.tune_models:
-        result = tune(algo, X_train_t, y_train, settings, scale_pos_weight)
+        result = tune(algo, X_train_t, y_train, settings, scale_pos_weight,
+                      categorical_indices=categorical_indices)
         algo_params[algo] = result["best_params"]
         study_scores[algo] = result["best_score"]
+        study_importances[algo] = result.get("param_importances", {})
         print(f"  {algo:<18} CV ROC-AUC = {result['best_score']:.4f}  {result['best_params']}")
 
     # ── Candidate comparison ──────────────────────────────────────────────────
     print("\nBuilding candidates and comparing with repeated CV:")
-    candidates = build_candidates(algo_params, settings, scale_pos_weight)
+    candidates = build_candidates(algo_params, settings, scale_pos_weight,
+                                   categorical_indices=categorical_indices)
     cv_table = compare_candidates(candidates, X_train_t, y_train, settings)
     print(pd.DataFrame(cv_table).to_string(index=False))
 
-    best_row = max(cv_table, key=lambda r: r["cv_roc_auc_mean"])
+    best_row = max(
+        cv_table,
+        key=lambda r: (r["cv_roc_auc_mean"], -r["cv_brier_mean"], r.get("cv_f1_mean", 0.0)),
+    )
     champion_name = best_row["model"]
     print(f"\nChampion candidate: {champion_name} (CV ROC-AUC {best_row['cv_roc_auc_mean']:.4f})")
 
@@ -128,7 +141,7 @@ def main():
             X_train_t, y_train, X_val_t, y_val
         )
         calibration_name, calibrator = best_cal
-        print(f"Calibration: {dict(calibration_results)} → chosen {calibration_name}")
+        print(f"Calibration: {dict(calibration_results)} -> chosen {calibration_name}")
 
     def final_proba(X):
         if calibrator is not None:
@@ -148,15 +161,19 @@ def main():
     surrogate = None
     surrogate_name = None
     explanation_surrogate = False
-    if champion_name in (config.MODEL_NAMES["voting"], config.MODEL_NAMES["stacking"]):
+    if not shap_compatible(champion_estimator):
         singles = {c: candidates[c]["estimator"] for c in candidates if c not in
                    (config.MODEL_NAMES["voting"], config.MODEL_NAMES["stacking"])}
-        best_single = max(singles, key=lambda c: next(r["cv_roc_auc_mean"] for r in cv_table if r["model"] == c))
-        surrogate = singles[best_single]
+        # Choose the best single that SHAP can actually explain (not the champion's own class).
+        shap_singles = {c: e for c, e in singles.items() if shap_compatible(e)}
+        if not shap_singles:
+            raise RuntimeError("No SHAP-compatible single model available for surrogate.")
+        best_single = max(shap_singles, key=lambda c: next(r["cv_roc_auc_mean"] for r in cv_table if r["model"] == c))
+        surrogate = shap_singles[best_single]
         surrogate.fit(X_train_t, y_train)
         surrogate_name = best_single
         explanation_surrogate = True
-        print(f"SHAP surrogate: {best_single}")
+        print(f"SHAP surrogate: {best_single} (champion {champion_name} has no exact SHAP)")
 
     # ── Run artefacts ─────────────────────────────────────────────────────────
     run_id = experiments.new_run_id(champion_name.lower().replace(" ", "_"))
@@ -165,8 +182,8 @@ def main():
     plots = run_root / "plots"
     plots.mkdir(parents=True, exist_ok=True)
 
-    plot_roc(y_test, test_proba, plots)
-    plot_pr(y_test, test_proba, plots)
+    plot_roc(y_test, test_proba, plots, threshold=threshold)
+    plot_pr(y_test, test_proba, plots, threshold=threshold)
     plot_calibration(y_test, test_proba, plots)
     curve_data = plot_learning_curve(champion_estimator, X_train_t, y_train, plots,
                                      splits=settings.cv_splits)
@@ -186,7 +203,10 @@ def main():
         "estimator_key": next(k for k, v in config.MODEL_NAMES.items() if v == champion_name),
         "cv_roc_auc_mean": best_row["cv_roc_auc_mean"],
         "cv_roc_auc_std": best_row["cv_roc_auc_std"],
+        "cv_brier_mean": best_row.get("cv_brier_mean"),
+        "cv_f1_mean": best_row.get("cv_f1_mean"),
         "study_scores": study_scores,
+        "optuna_param_importances": study_importances,
         "tuned_params": algo_params,
         "threshold": threshold,
         "threshold_metric": settings.threshold_metric,
@@ -198,10 +218,10 @@ def main():
         "feature_names": names,
         "active_numeric_features": available_numeric,
         "label_map": config.LABEL_MAP,
-        "n_train": int(len(X_train_t)),
-        "n_val": int(len(X_val_t)),
-        "n_test": int(len(X_test_t)),
-        "n_total": int(len(df)),
+        "n_train": len(X_train_t),
+        "n_val": len(X_val_t),
+        "n_test": len(X_test_t),
+        "n_total": len(df),
         "settings": settings.to_dict(),
         "elapsed_seconds": round(time.time() - start, 1),
         "learning_curve": curve_data,
@@ -230,7 +250,11 @@ def main():
     X_all_engineered = engineer(
         df.drop(columns=[c for c in drop_cols if c in df.columns])
     )
-    explain_and_save(explain_estimator, preprocessor, names, X_all_engineered, run_root)
+    explain_info = explain_and_save(explain_estimator, preprocessor, names, X_all_engineered, run_root)
+    shap_values = np.load(run_root / "shap_values.npy")
+    plot_importance_comparison(perm_df, shap_values, names, plots)
+    explain_info["importance_comparison_plot"] = "importance_comparison.png"
+    run_root.joinpath("explainer_info.json").write_text(json.dumps(explain_info, indent=2))
 
     save_reference(df.assign(**{c: df[c] for c in df.columns}), run_root / "reference_features.json")
 
@@ -240,14 +264,14 @@ def main():
     experiments.register(run_id, meta)
     result = experiments.select_champion(run_id, meta, run_root)
     print(f"\nRun {run_id} registered. Champion promoted: {result['promoted']}")
-    print(f"Artifacts → {run_root}")
+    print(f"Artifacts -> {run_root}")
 
     # ── Salary regression (optional, runs after main pipeline) ───────────────
     print("\nTraining salary regression model…")
     salary_meta = train_salary_model(df)
     if salary_meta:
         meta["salary_model"] = salary_meta
-        print(f"  Salary model saved → {config.SALARY_BUNDLE_PATH}")
+        print(f"  Salary model saved -> {config.SALARY_BUNDLE_PATH}")
     else:
         print("  Salary model skipped (insufficient data).")
 
@@ -256,3 +280,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

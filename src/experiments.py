@@ -30,6 +30,7 @@ def register(run_id, meta):
         "model_name": meta["model_name"],
         "created_at": meta["created_at"],
         "cv_roc_auc_mean": meta["cv_roc_auc_mean"],
+        "cv_brier_mean": meta.get("cv_brier_mean"),
         "test_metrics": meta["test_metrics"],
         "tuned_params": meta.get("tuned_params"),
         "calibration": meta.get("calibration_method"),
@@ -40,18 +41,23 @@ def register(run_id, meta):
 
 
 def champion_score(meta):
+    """Rank candidates by CV ROC-AUC, then Brier score, then F1."""
     cv = meta["cv_roc_auc_mean"]
+    brier = meta["test_metrics"].get("brier", 1.0)
     f1 = meta["test_metrics"].get("f1", 0.0)
-    return (cv, f1)
+    return (cv, -brier, f1)
 
 
 def _beats(current, previous):
-    cur_cv, cur_f1 = current
-    prev_cv, prev_f1 = previous
+    cur_cv, cur_brier_neg, cur_f1 = current
+    prev_cv, prev_brier_neg, prev_f1 = previous
     if cur_cv > prev_cv + 1e-12:
         return True
-    if abs(cur_cv - prev_cv) <= 1e-12 and cur_f1 >= prev_f1:
-        return True
+    if abs(cur_cv - prev_cv) <= 1e-12:
+        if cur_brier_neg > prev_brier_neg + 1e-12:
+            return True
+        if abs(cur_brier_neg - prev_brier_neg) <= 1e-12 and cur_f1 >= prev_f1:
+            return True
     return False
 
 
@@ -66,8 +72,9 @@ def select_champion(run_id, meta, run_root):
         prev = next((r for r in registry["runs"] if r["run_id"] == current_champion["run_id"]), None)
         if prev is not None:
             prev_cv = prev["cv_roc_auc_mean"]
+            prev_brier = prev["test_metrics"].get("brier", 1.0)
             prev_f1 = prev["test_metrics"].get("f1", 0.0)
-            is_better = _beats(current, (prev_cv, prev_f1))
+            is_better = _beats(current, (prev_cv, -prev_brier, prev_f1))
         else:
             is_better = True
 
