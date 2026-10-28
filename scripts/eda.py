@@ -28,7 +28,6 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import seaborn as sns
 
@@ -110,21 +109,33 @@ def plot_categorical_rates(df: pd.DataFrame) -> str:
 
 
 def plot_correlation_heatmap(df: pd.DataFrame) -> str:
-    """4. Correlation heatmap of numeric features vs target."""
-    df = df.copy()
+    """4. Full Pearson correlation heatmap of all numeric features vs target."""
+    df = add_feature_engineering(df.copy())
     df["placed_code"] = (df[config.TARGET] == "Placed").astype(int)
-    numeric = [
-        c for c in config.BENROSHAN_NUMERIC + config.KUMBHAR_NUMERIC + ["placed_code"]
+    candidates = [
+        c for c in config.ALL_NUMERIC + ["placed_code"]
         if c in df.columns
     ]
+    # Keep only columns that actually carry variation in this dataset.
+    numeric = [
+        c for c in candidates
+        if df[c].notna().sum() >= 2 and df[c].nunique(dropna=True) > 1
+    ]
     corr = df[numeric].corr()
-    fig, ax = plt.subplots(figsize=(11, 8))
-    mask = np.triu(np.ones_like(corr, dtype=bool), k=1)
-    sns.heatmap(corr, mask=mask, annot=True, fmt=".2f", cmap="RdBu_r",
-                center=0, vmin=-1, vmax=1, ax=ax,
-                annot_kws={"fontsize": 8}, square=True, linewidths=0.4)
-    ax.set_title("Correlation Heatmap of Numeric Features (incl. target)",
-                 fontsize=13, fontweight="bold")
+
+    n = len(numeric)
+    fig, ax = plt.subplots(figsize=(max(9, n * 0.85), max(7, n * 0.72)))
+    sns.heatmap(
+        corr, annot=True, fmt=".2f", cmap="RdBu_r",
+        center=0, vmin=-1, vmax=1, ax=ax,
+        annot_kws={"fontsize": 7 if n > 12 else 8},
+        square=True, linewidths=0.4, linecolor="white",
+        cbar_kws={"shrink": 0.8, "label": "Pearson r"},
+    )
+    ax.set_title("Full Correlation Heatmap — Numeric Features and Target",
+                 fontsize=13, fontweight="bold", pad=14)
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right", fontsize=8)
+    ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=8)
     fig.tight_layout()
     return _save(fig, "correlation_heatmap.png")
 
