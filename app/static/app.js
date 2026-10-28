@@ -96,18 +96,31 @@ async function loadDrift() {
 // ── Prediction form ───────────────────────────────────────────────────────────
 
 const EXAMPLE = {
-  gender: "M", ssc_p: 67.0, ssc_b: "Others", hsc_p: 91.0, hsc_b: "Others",
-  hsc_s: "Commerce", degree_p: 58.0, degree_t: "Sci&Tech", workex: "No",
-  etest_p: 55.0, specialisation: "Mkt&HR", mba_p: 58.8,
+  gender: "M", tenth_p: 67.0, tenth_b: "Others", twelfth_p: 91.0, twelfth_b: "Others",
+  twelfth_s: "Commerce", degree_p: 58.0, degree_t: "Sci&Tech", workex: "No",
+  etest_p: 55.0, mba_p: 58.8, has_masters: "Yes", masters_type: "MBA",
+  specialisation: "Mkt&HR",
 };
 
 const form = document.getElementById("predict-form");
+const hasMastersEl = document.getElementById("f-has_masters");
+
+function syncMastersFields() {
+  const yes = hasMastersEl.value === "Yes";
+  document.getElementById("masters-type-field").hidden = !yes;
+  document.getElementById("specialisation-field").hidden = !yes;
+  if (!yes) document.getElementById("f-mba_p").value = 0;
+}
+
+hasMastersEl.addEventListener("change", syncMastersFields);
+syncMastersFields();
 
 document.getElementById("prefill").addEventListener("click", () => {
   Object.entries(EXAMPLE).forEach(([k, v]) => {
     const el = form.elements[k];
     if (el) el.value = v;
   });
+  syncMastersFields();
 });
 
 document.getElementById("clear").addEventListener("click", () => {
@@ -120,8 +133,16 @@ document.getElementById("clear").addEventListener("click", () => {
 function formData() {
   const data = Object.fromEntries(new FormData(form).entries());
   // Parse numeric fields
-  for (const k of ["ssc_p", "hsc_p", "degree_p", "etest_p", "mba_p"]) {
+  for (const k of ["tenth_p", "twelfth_p", "degree_p", "etest_p", "mba_p"]) {
     if (data[k] !== "") data[k] = parseFloat(data[k]);
+  }
+  // Keep masters fields internally consistent
+  if (data.has_masters !== "Yes") {
+    data.has_masters = "No";
+    data.masters_type = "None";
+    data.mba_p = 0;
+  } else if (!data.masters_type || data.masters_type === "None") {
+    data.masters_type = "MBA";
   }
   // Optional Kumbhar fields — only include if non-empty
   for (const k of ["cgpa", "aptitude_score", "soft_skills"]) {
@@ -358,7 +379,7 @@ cfBtn.addEventListener("click", async () => {
 // ── Batch ─────────────────────────────────────────────────────────────────────
 
 const BATCH_EXAMPLE_EXTRA = {
-  ...EXAMPLE, ssc_p: 50, hsc_p: 62, degree_p: 52, mba_p: 50, etest_p: 40,
+  ...EXAMPLE, tenth_p: 50, twelfth_p: 62, degree_p: 52, mba_p: 50, etest_p: 40,
 };
 
 document.getElementById("batch-example").addEventListener("click", () => {

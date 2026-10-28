@@ -84,9 +84,12 @@ def main():
     )
 
     # ── Preprocessing ─────────────────────────────────────────────────────────
-    # Only pass numeric columns that actually contain observations (Kumbhar
-    # columns are all-NaN on the Ben Roshan set and must not enter the imputer).
-    preprocessor = build_preprocessor(available_numeric)
+    # Only pass columns that actually contain observations (Kumbhar columns are
+    # all-NaN on the Ben Roshan set and must not enter the imputer).
+    preprocessor_cols = available_numeric + [
+        c for c in config.CATEGORICAL_FEATURES if c in X_engineered.columns
+    ]
+    preprocessor = build_preprocessor(preprocessor_cols)
     X_train_t = preprocessor.fit_transform(X_train)
     X_val_t = preprocessor.transform(X_val)
     X_test_t = preprocessor.transform(X_test)

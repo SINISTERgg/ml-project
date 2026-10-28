@@ -16,6 +16,7 @@ Plots produced:
     5. marks_boxplots.png             - boxplots of key marks split by status
     6. academic_avg_vs_status.png     - engineered academic average vs placement
     7. gender_specialisation.png      - placement by gender x specialisation (bonus)
+    8. masters_placement.png          - placement by master's completion / programme
 """
 
 from __future__ import annotations
@@ -130,7 +131,7 @@ def plot_correlation_heatmap(df: pd.DataFrame) -> str:
 
 def plot_marks_boxplots(df: pd.DataFrame) -> str:
     """5. Marks by placement status (boxplots)."""
-    cols = [c for c in ["etest_p", "ssc_p", "hsc_p", "degree_p", "mba_p", "cgpa"]
+    cols = [c for c in ["etest_p", "tenth_p", "twelfth_p", "degree_p", "mba_p", "cgpa"]
             if c in df.columns]
     statuses = ["Not Placed", "Placed"]
     fig, axes = plt.subplots(2, 3, figsize=(13, 7))
@@ -187,6 +188,42 @@ def plot_gender_specialisation(df: pd.DataFrame) -> str:
     return _save(fig, "gender_specialisation.png")
 
 
+def plot_masters(df: pd.DataFrame) -> str:
+    """8. Placement rate by master's completion and programme type."""
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
+
+    has_rate = (
+        df.groupby("has_masters")[config.TARGET]
+        .apply(lambda s: (s == "Placed").mean())
+        .mul(100)
+        .reindex(["No", "Yes"])
+    )
+    bars = axes[0].bar(has_rate.index, has_rate.values, color=["#8e24aa", "#2e7d32"])
+    for bar, val in zip(bars, has_rate.values):
+        axes[0].text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1,
+                     f"{val:.0f}%", ha="center", fontsize=10)
+    axes[0].set_title("Placement Rate by Master's Completion")
+    axes[0].set_ylabel("Placement rate (%)")
+    axes[0].set_ylim(0, max(has_rate.max() * 1.15, 10))
+
+    type_rate = (
+        df.groupby("masters_type")[config.TARGET]
+        .apply(lambda s: (s == "Placed").mean())
+        .mul(100)
+        .sort_values()
+    )
+    bars = axes[1].bar(type_rate.index.astype(str), type_rate.values, color="#1565c0")
+    for bar, val in zip(bars, type_rate.values):
+        axes[1].text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1,
+                     f"{val:.0f}%", ha="center", fontsize=10)
+    axes[1].set_title("Placement Rate by Master's Programme")
+    axes[1].set_ylim(0, max(type_rate.max() * 1.15, 10))
+
+    fig.suptitle("Master's Pathway vs Placement", fontsize=14, fontweight="bold")
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    return _save(fig, "masters_placement.png")
+
+
 def data_summary(df: pd.DataFrame) -> None:
     """Print a written EDA summary for the report."""
     placed_rate = (df[config.TARGET] == "Placed").mean()
@@ -209,11 +246,13 @@ def data_summary(df: pd.DataFrame) -> None:
     for col, r in top:
         print(f"  {col:10s} r = {r:+.3f}")
     print("\nKey insights:")
-    print("  1. Higher employability test (etest_p) and masters (mba_p) scores "
-          "are the strongest numeric predictors of placement.")
+    print("  1. 10th/12th/degree percentages are the strongest linear correlates; "
+          "etest_p adds non-linear signal.")
     print("  2. Students with work experience show a notably higher placement rate.")
     print("  3. Science/STEM-background students are more likely to be placed.")
-    print("  4. The SD of marks is wide; academic quality varies heavily by stream.")
+    print("  4. Master's completion/programme adds a pathway signal "
+          "(fields synthesised from a fixed seed).")
+    print("  5. The SD of marks is wide; academic quality varies heavily by stream.")
     print("=" * 70)
 
 
@@ -229,7 +268,8 @@ def main() -> None:
     plot_marks_boxplots(df)
     plot_academic_avg(df)
     plot_gender_specialisation(df)
-    print("\nEDA complete — 7 plots written to models/plots/eda/.")
+    plot_masters(df)
+    print("\nEDA complete — 8 plots written to models/plots/eda/.")
 
 
 if __name__ == "__main__":

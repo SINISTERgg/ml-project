@@ -1,69 +1,110 @@
 {
-  "run_id": "20260915-193804-svc",
-  "created_at": "2026-09-15T14:08:04Z",
+  "run_id": "20261028-191205-svc",
+  "created_at": "2026-10-28T13:42:06Z",
   "model_name": "SVC",
   "estimator_key": "svc",
-  "cv_roc_auc_mean": 0.9476824777994369,
-  "cv_roc_auc_std": 0.03433779212420614,
+  "cv_roc_auc_mean": 0.94167749620966,
+  "cv_roc_auc_std": 0.03854516566354032,
+  "cv_brier_mean": 0.09867791112118725,
+  "cv_f1_mean": 0.8976318187912994,
   "study_scores": {
-    "logistic": 0.9335445094217023,
-    "random_forest": 0.9242202729044834,
-    "gradient_boosting": 0.9519818063677713,
-    "xgboost": 0.9413742690058481,
-    "svc": 0.9400747238466536
+    "logistic": 0.9264132553606238,
+    "random_forest": 0.9032001299545159,
+    "gradient_boosting": 0.939311241065627,
+    "xgboost": 0.9310591293047434,
+    "svc": 0.9345841455490577
+  },
+  "optuna_param_importances": {
+    "logistic": {
+      "C": 1.0
+    },
+    "random_forest": {
+      "min_samples_split": 0.5038595587387085,
+      "min_samples_leaf": 0.37122542436002187,
+      "n_estimators": 0.06518178873111742,
+      "max_depth": 0.05708847690791133,
+      "max_features": 0.0026447512622409033
+    },
+    "gradient_boosting": {
+      "max_depth": 0.3391105807358255,
+      "min_samples_leaf": 0.2575440694546692,
+      "subsample": 0.21409039628088425,
+      "learning_rate": 0.16344216105538836,
+      "n_estimators": 0.025812792473232735
+    },
+    "xgboost": {
+      "min_child_weight": 0.40022319852108545,
+      "learning_rate": 0.2249713323096099,
+      "max_depth": 0.14645230032680065,
+      "reg_alpha": 0.08162112228050676,
+      "subsample": 0.07510566253934105,
+      "colsample_bytree": 0.023301383692568383,
+      "reg_lambda": 0.02272551878605833,
+      "gamma": 0.014028750721916524,
+      "n_estimators": 0.011570730822112775
+    },
+    "svc": {
+      "C": 0.845199572006466,
+      "gamma": 0.15480042799353405
+    }
   },
   "tuned_params": {
     "logistic": {
-      "C": 5.276942599101511
+      "C": 16.7859816422663
     },
     "random_forest": {
       "n_estimators": 600,
-      "max_depth": 10,
-      "min_samples_leaf": 1,
-      "max_features": "sqrt"
+      "max_depth": 8,
+      "min_samples_leaf": 2,
+      "min_samples_split": 5,
+      "max_features": 0.5
     },
     "gradient_boosting": {
-      "learning_rate": 0.21861820718084368,
-      "n_estimators": 213,
-      "max_depth": 2,
-      "subsample": 0.9979175968421743
+      "learning_rate": 0.08051476150479793,
+      "n_estimators": 254,
+      "max_depth": 5,
+      "subsample": 0.854401201925222,
+      "min_samples_leaf": 5
     },
     "xgboost": {
-      "learning_rate": 0.04905460393064711,
-      "n_estimators": 258,
-      "max_depth": 6,
-      "subsample": 0.7609502495425304,
-      "colsample_bytree": 0.6383366086109044,
-      "reg_lambda": 0.20554236604373477
+      "learning_rate": 0.2028653560442699,
+      "n_estimators": 115,
+      "max_depth": 5,
+      "min_child_weight": 0.7956459042953172,
+      "gamma": 0.0006229962075639478,
+      "subsample": 0.8421335684949638,
+      "colsample_bytree": 0.7078108382557861,
+      "reg_alpha": 0.0029088057141010057,
+      "reg_lambda": 0.4110638289872837
     },
     "svc": {
-      "C": 164.30791320637917,
-      "gamma": 0.0017568672579739645
+      "C": 392.9821322903376,
+      "gamma": 0.0019592076566280763
     }
   },
-  "threshold": 0.5532468989978788,
+  "threshold": 0.744618163571613,
   "threshold_metric": "f1",
   "test_metrics": {
-    "accuracy": 0.8372093023255814,
-    "precision": 0.96,
-    "recall": 0.8,
-    "f1": 0.8727272727272727,
-    "roc_auc": 0.9128205128205128,
-    "pr_auc": 0.9615515404602286,
-    "brier": 0.13471097591543446,
-    "threshold": 0.5532468989978788
+    "accuracy": 0.7906976744186046,
+    "precision": 0.9565217391304348,
+    "recall": 0.7333333333333333,
+    "f1": 0.8301886792452831,
+    "roc_auc": 0.9256410256410257,
+    "pr_auc": 0.968040681880512,
+    "brier": 0.115926274140543,
+    "threshold": 0.744618163571613
   },
-  "calibration_method": "none",
+  "calibration_method": "sigmoid",
   "calibration_results": {
-    "none": 0.11636982182968005,
-    "isotonic": 0.13668343297867716,
-    "sigmoid": 0.11975182982141049
+    "none": 0.1226681867714674,
+    "isotonic": 0.1346605946738776,
+    "sigmoid": 0.1211870821416592
   },
   "explanation_mode": "surrogate",
   "surrogate_model": "XGBoost",
   "feature_names": [
-    "num__ssc_p",
-    "num__hsc_p",
+    "num__tenth_p",
+    "num__twelfth_p",
     "num__degree_p",
     "num__etest_p",
     "num__mba_p",
@@ -73,20 +114,24 @@
     "num__activity_score",
     "num__skills_composite",
     "cat__gender_M",
-    "cat__ssc_b_Others",
-    "cat__hsc_b_Others",
-    "cat__hsc_s_Arts",
-    "cat__hsc_s_Commerce",
-    "cat__hsc_s_Science",
+    "cat__tenth_b_Others",
+    "cat__twelfth_b_Others",
+    "cat__twelfth_s_Arts",
+    "cat__twelfth_s_Commerce",
+    "cat__twelfth_s_Science",
     "cat__degree_t_Comm&Mgmt",
     "cat__degree_t_Others",
     "cat__degree_t_Sci&Tech",
     "cat__workex_Yes",
-    "cat__specialisation_Mkt&HR"
+    "cat__specialisation_Mkt&HR",
+    "cat__has_masters_Yes",
+    "cat__masters_type_MBA",
+    "cat__masters_type_MS",
+    "cat__masters_type_Other"
   ],
   "active_numeric_features": [
-    "ssc_p",
-    "hsc_p",
+    "tenth_p",
+    "twelfth_p",
     "degree_p",
     "etest_p",
     "mba_p",
@@ -131,7 +176,7 @@
     "use_voting": true,
     "use_stacking": true
   },
-  "elapsed_seconds": 117.6,
+  "elapsed_seconds": 213.5,
   "learning_curve": {
     "train_sizes": [
       32,
@@ -141,18 +186,18 @@
       109
     ],
     "train": [
-      0.9974025974025974,
-      0.9842219123076509,
-      0.9677920137833181,
-      0.9734529891970363,
-      0.9741533802710274
+      0.999134199134199,
+      0.9912814630662679,
+      0.9822005439005439,
+      0.9795582034023994,
+      0.9833707320766145
     ],
     "cv": [
-      0.8634178037686808,
-      0.9236679662118258,
-      0.9426900584795324,
-      0.9376868096166341,
-      0.9450942170240417
+      0.8405458089668615,
+      0.8858836907082521,
+      0.8995776478232619,
+      0.9191358024691357,
+      0.9345841455490577
     ]
   }
 }

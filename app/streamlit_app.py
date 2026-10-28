@@ -25,9 +25,9 @@ import streamlit as st
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src import config
-from src.predict import Predictor
-from src.salary import load_salary_predictor
+from src import config  # noqa: E402
+from src.predict import Predictor  # noqa: E402
+from src.salary import load_salary_predictor  # noqa: E402
 
 st.set_page_config(
     page_title="PlaceIQ — Student Placement Predictor",
@@ -61,12 +61,14 @@ except (OSError, ValueError, RuntimeError, AttributeError) as exc:  # pragma: no
 
 CATEGORY_VALUES = {
     "gender": ["M", "F"],
-    "ssc_b": ["Central", "Others"],
-    "hsc_b": ["Central", "Others"],
-    "hsc_s": ["Commerce", "Science", "Arts"],
+    "tenth_b": ["Central", "Others"],
+    "twelfth_b": ["Central", "Others"],
+    "twelfth_s": ["Commerce", "Science", "Arts"],
     "degree_t": ["Sci&Tech", "Comm&Mgmt", "Others"],
     "workex": ["Yes", "No"],
     "specialisation": ["Mkt&Fin", "Mkt&HR"],
+    "has_masters": ["No", "Yes"],
+    "masters_type": ["MBA", "MS", "Other"],
 }
 
 
@@ -78,55 +80,82 @@ def build_form_inputs(defaults: dict | None = None) -> dict:
         gender = st.radio("Gender", CATEGORY_VALUES["gender"],
                           index=CATEGORY_VALUES["gender"].index(defaults.get("gender", "M")),
                           horizontal=True)
-        ssc_p = st.number_input("SSC Percentage", 0.0, 100.0, float(defaults.get("ssc_p", 70.0)), 0.5)
-        hsc_p = st.number_input("HSC Percentage", 0.0, 100.0, float(defaults.get("hsc_p", 70.0)), 0.5)
+        tenth_p = st.number_input("10th Grade Percentage", 0.0, 100.0,
+                                  float(defaults.get("tenth_p", 70.0)), 0.5)
+        twelfth_p = st.number_input("12th Grade Percentage", 0.0, 100.0,
+                                    float(defaults.get("twelfth_p", 70.0)), 0.5)
     with c2:
-        ssc_b = st.selectbox("SSC Board", CATEGORY_VALUES["ssc_b"],
-                             index=CATEGORY_VALUES["ssc_b"].index(defaults.get("ssc_b", "Central")))
-        hsc_b = st.selectbox("HSC Board", CATEGORY_VALUES["hsc_b"],
-                             index=CATEGORY_VALUES["hsc_b"].index(defaults.get("hsc_b", "Central")))
-        hsc_s = st.selectbox("HSC Stream", CATEGORY_VALUES["hsc_s"],
-                             index=CATEGORY_VALUES["hsc_s"].index(defaults.get("hsc_s", "Science")))
+        tenth_b = st.selectbox("10th Board", CATEGORY_VALUES["tenth_b"],
+                               index=CATEGORY_VALUES["tenth_b"].index(defaults.get("tenth_b", "Central")))
+        twelfth_b = st.selectbox("12th Board", CATEGORY_VALUES["twelfth_b"],
+                                 index=CATEGORY_VALUES["twelfth_b"].index(defaults.get("twelfth_b", "Central")))
+        twelfth_s = st.selectbox("12th Stream", CATEGORY_VALUES["twelfth_s"],
+                                 index=CATEGORY_VALUES["twelfth_s"].index(defaults.get("twelfth_s", "Science")))
     with c3:
-        degree_p = st.number_input("Degree Percentage", 0.0, 100.0, float(defaults.get("degree_p", 65.0)), 0.5)
-        etest_p = st.number_input("Employability Test %", 0.0, 100.0, float(defaults.get("etest_p", 65.0)), 0.5)
-        mba_p = st.number_input("MBA Percentage", 0.0, 100.0, float(defaults.get("mba_p", 65.0)), 0.5)
+        degree_p = st.number_input("Degree Percentage", 0.0, 100.0,
+                                   float(defaults.get("degree_p", 65.0)), 0.5)
+        etest_p = st.number_input("Employability Test %", 0.0, 100.0,
+                                  float(defaults.get("etest_p", 65.0)), 0.5)
+        mba_p = st.number_input("Masters Percentage (0 if none)", 0.0, 100.0,
+                                float(defaults.get("mba_p", 65.0) or 0.0), 0.5)
 
-    st.markdown("#### Course & experience")
-    c4, c5 = st.columns(2)
+    st.markdown("#### Masters, course & experience")
+    c4, c5, c6 = st.columns(3)
     with c4:
         degree_t = st.selectbox("Degree Type", CATEGORY_VALUES["degree_t"],
                                 index=CATEGORY_VALUES["degree_t"].index(defaults.get("degree_t", "Sci&Tech")))
-        specialisation = st.selectbox("MBA Specialisation", CATEGORY_VALUES["specialisation"],
-                                      index=CATEGORY_VALUES["specialisation"].index(defaults.get("specialisation", "Mkt&Fin")))
     with c5:
+        has_masters = st.radio("Completed a Master's?", CATEGORY_VALUES["has_masters"],
+                               index=CATEGORY_VALUES["has_masters"].index(defaults.get("has_masters", "No")),
+                               horizontal=True)
+    with c6:
         workex = st.radio("Work Experience", CATEGORY_VALUES["workex"],
                           index=CATEGORY_VALUES["workex"].index(defaults.get("workex", "No")),
                           horizontal=True)
 
+    if has_masters == "Yes":
+        c7, c8 = st.columns(2)
+        default_type = defaults.get("masters_type", "MBA")
+        if default_type not in CATEGORY_VALUES["masters_type"]:
+            default_type = "MBA"
+        with c7:
+            masters_type = st.selectbox("Masters Programme", CATEGORY_VALUES["masters_type"],
+                                        index=CATEGORY_VALUES["masters_type"].index(default_type))
+        with c8:
+            specialisation = st.selectbox("MBA Specialisation", CATEGORY_VALUES["specialisation"],
+                                          index=CATEGORY_VALUES["specialisation"].index(defaults.get("specialisation", "Mkt&Fin")))
+    else:
+        masters_type = "None"
+        mba_p = 0.0
+        specialisation = st.selectbox("MBA Specialisation (not applicable)", CATEGORY_VALUES["specialisation"],
+                                      index=CATEGORY_VALUES["specialisation"].index(defaults.get("specialisation", "Mkt&Fin")),
+                                      disabled=True)
+
     with st.expander("Optional skill features (improve accuracy)"):
-        c6, c7, c8 = st.columns(3)
-        with c6:
+        c9, c10, c11 = st.columns(3)
+        with c9:
             cgpa = st.number_input("CGPA (0-10)", 0.0, 10.0,
                                    float(defaults.get("cgpa", 7.5) or 7.5), 0.1)
             internships = st.number_input("Internships (#)", 0, 10,
                                           int(defaults.get("internships", 1) or 1), 1)
-        with c7:
+        with c10:
             projects = st.number_input("Projects (#)", 0, 20,
                                        int(defaults.get("projects", 2) or 2), 1)
             workshops = st.number_input("Workshops/Certs (#)", 0, 20,
                                         int(defaults.get("workshops", 1) or 1), 1)
-        with c8:
+        with c11:
             aptitude_score = st.number_input("Aptitude Score (0-100)", 0.0, 100.0,
                                              float(defaults.get("aptitude_score", 65.0) or 65.0), 1.0)
             soft_skills = st.number_input("Soft Skills Rating (0-10)", 0.0, 10.0,
                                           float(defaults.get("soft_skills", 6.0) or 6.0), 0.5)
 
     return {
-        "gender": gender, "ssc_p": ssc_p, "ssc_b": ssc_b, "hsc_p": hsc_p,
-        "hsc_b": hsc_b, "hsc_s": hsc_s, "degree_p": degree_p, "degree_t": degree_t,
-        "workex": workex, "etest_p": etest_p, "specialisation": specialisation,
-        "mba_p": mba_p, "cgpa": cgpa, "internships": internships, "projects": projects,
+        "gender": gender, "tenth_p": tenth_p, "tenth_b": tenth_b,
+        "twelfth_p": twelfth_p, "twelfth_b": twelfth_b, "twelfth_s": twelfth_s,
+        "degree_p": degree_p, "degree_t": degree_t, "workex": workex,
+        "etest_p": etest_p, "specialisation": specialisation, "mba_p": mba_p,
+        "has_masters": has_masters, "masters_type": masters_type,
+        "cgpa": cgpa, "internships": internships, "projects": projects,
         "workshops": workshops, "aptitude_score": aptitude_score, "soft_skills": soft_skills,
     }
 
@@ -234,12 +263,12 @@ if tab == "Predict":
 # ── Tab: Batch scoring ────────────────────────────────────────────────────────
 elif tab == "Batch Scoring":
     st.header("📋 Batch Scoring")
-    st.caption("Paste rows in CSV/TSV format with the same column names (gender, ssc_p, … mba_p). "
+    st.caption("Paste rows in CSV/TSV format with the same column names (gender, tenth_p, … mba_p, has_masters, masters_type). "
                "Optional skill columns may be omitted.")
     sample = st.code(
-        "gender,ssc_p,ssc_b,hsc_p,hsc_b,hsc_s,degree_p,degree_t,workex,etest_p,specialisation,mba_p\n"
-        "M,78.0,Central,82.0,Central,Science,72.0,Sci&Tech,Yes,85.0,Mkt&Fin,68.0\n"
-        "F,55.0,Others,58.0,Others,Arts,60.0,Comm&Mgmt,No,45.0,Mkt&HR,52.0",
+        "gender,tenth_p,tenth_b,twelfth_p,twelfth_b,twelfth_s,degree_p,degree_t,workex,etest_p,specialisation,mba_p,has_masters,masters_type\n"
+        "M,78.0,Central,82.0,Central,Science,72.0,Sci&Tech,Yes,85.0,Mkt&Fin,68.0,Yes,MBA\n"
+        "F,55.0,Others,58.0,Others,Arts,60.0,Comm&Mgmt,No,45.0,Mkt&HR,0.0,No,None",
         language="text",
     )
     text_area = st.text_area("Paste your data (CSV/TSV)", height=180)
@@ -346,6 +375,7 @@ else:
             "marks_boxplots.png": "5 · Marks by placement status",
             "academic_avg_vs_status.png": "6 · Academic average vs placement",
             "gender_specialisation.png": "7 · Gender x specialisation placement rates",
+            "masters_placement.png": "8 · Master's completion / programme vs placement",
         }
         files = [p for p in sorted(eda_dir.glob("*.png"))
                  if p.name in captions] if eda_dir.exists() else []

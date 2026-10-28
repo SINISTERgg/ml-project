@@ -44,4 +44,4 @@
 - **Explainable**: positive-class SHAP fixed for multi-class
 - **Ethical**: counterfactuals don't suggest changing gender/boards/scores
 - **Production-minded**: health/ready probes, locked logging, PSI drift, CI
-- **Metrics**: ROC-AUC 0.913, Precision 0.960, Recall 0.800, F1 0.873
+- **Metrics**: ROC-AUC 0.926, Precision 0.957, Recall 0.733, F1 0.830

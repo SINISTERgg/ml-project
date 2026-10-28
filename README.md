@@ -30,7 +30,7 @@ Full write-up and marking-scheme mapping: [`reports/project_report.md`](reports/
 
 | Dataset | Rows | Key features |
 |---|---|---|
-| [Ben Roshan — Campus Placement](https://www.kaggle.com/datasets/benroshan/factors-affecting-campus-placement) | 215 | ssc_p, hsc_p, degree_p, mba_p, workex, salary |
+| [Ben Roshan — Campus Placement](https://www.kaggle.com/datasets/benroshan/factors-affecting-campus-placement) | 215 | tenth_p, twelfth_p, degree_p, mba_p, workex, salary |
 | [Ruchika Kumbhar — Placement Prediction](https://www.kaggle.com/datasets/ruchikakumbhar/placement-prediction-dataset) | ~10k | CGPA, Internships, Projects, Workshops, AptitudeScore, SoftSkills |
 
 Download both:
@@ -86,7 +86,7 @@ found in `models/`. The `backend` service starts the API on port 8000.
 
 | Deliverable | Where |
 |---|---|
-| ≥ 5 EDA visualisations | `scripts/eda.py` → 7 plots in `models/plots/eda/` |
+| ≥ 5 EDA visualisations | `scripts/eda.py` → 8 plots in `models/plots/eda/` |
 | ≥ 3 ML algorithms | 5 models + voting/stacking in `src/ensemble.py` |
 | Hyperparameter tuning | Optuna in `src/tuning.py`, config `configs/train.json` |
 | Evaluation + interpretation | `reports/project_report.md` §8 |
@@ -109,6 +109,13 @@ Five engineered features are derived from both datasets:
 | `stem_flag` | 1 if Science stream or Sci&Tech degree, else 0 |
 | `activity_score` | internships + projects + workshops (0 when absent) |
 | `skills_composite` | (aptitude_score + soft_skills×10) / 2 |
+
+The schema also carries a master's pathway: `has_masters` (`Yes`/`No`) and
+`masters_type` (`None`/`MBA`/`MS`/`Other`). The public Kaggle files do not
+record non-MBA programmes, so the training set fills these deterministically
+from a fixed seed (documented as synthetic augmentation). Rows with an MBA
+score are always master's holders; programme type is sampled as MBA/MS/Other.
+Replace with real programme data when available.
 
 ---
 
@@ -133,14 +140,19 @@ Full interactive docs at **http://localhost:8000/docs**
 POST /api/predict
 {
   "gender": "M",
-  "ssc_p": 67, "ssc_b": "Others",
-  "hsc_p": 91, "hsc_b": "Others", "hsc_s": "Commerce",
+  "tenth_p": 67, "tenth_b": "Others",
+  "twelfth_p": 91, "twelfth_b": "Others", "twelfth_s": "Commerce",
   "degree_p": 58, "degree_t": "Sci&Tech",
   "workex": "No",
   "etest_p": 55, "specialisation": "Mkt&HR", "mba_p": 58.8,
+  "has_masters": "Yes", "masters_type": "MBA",
   "cgpa": 7.8, "internships": 2, "projects": 3
 }
 ```
+
+Master's fields: `has_masters` is `Yes`/`No`; when `Yes`, `masters_type`
+is one of `MBA`, `MS` or `Other` (and `mba_p` is the master's percentage).
+When `No`, `masters_type` is forced to `None` and `mba_p` may be omitted.
 
 Optional Kumbhar fields (`cgpa`, `internships`, `projects`, `workshops`,
 `aptitude_score`, `soft_skills`) improve accuracy when provided but are not
@@ -238,6 +250,8 @@ tests/
   test_features.py            feature engineering unit tests
   test_api.py                 API endpoint tests (mocked predictor)
 scripts/train_all.py          pipeline entrypoint
+scripts/migrate_schema.py     rewrite CSVs to the current 10th/12th + masters schema
+scripts/promote_run.py        force-promote a run after a schema change
 docker-compose.yml            backend + auto-trainer services
 .github/workflows/ci.yml      lint → test → docker-build CI pipeline
 ```

@@ -17,7 +17,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from . import config
 
 # Percentage columns that all datasets share
-PCT_COLS_CORE = ["ssc_p", "hsc_p", "degree_p", "mba_p"]
+PCT_COLS_CORE = ["tenth_p", "twelfth_p", "degree_p", "mba_p"]
 
 
 def add_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
@@ -37,8 +37,8 @@ def add_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
 
     # ── stem_flag: Science / Sci&Tech background ────────────────────────────
     stem = pd.Series(False, index=df.index)
-    if "hsc_s" in df.columns:
-        stem |= df["hsc_s"].eq("Science")
+    if "twelfth_s" in df.columns:
+        stem |= df["twelfth_s"].eq("Science")
     if "degree_t" in df.columns:
         stem |= df["degree_t"].eq("Sci&Tech")
     df["stem_flag"] = stem.astype(int)
@@ -69,7 +69,10 @@ def add_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
 
 def _columns_present(df_or_cols, column_list: list[str]) -> list[str]:
     """Return only those columns from column_list that exist in df_or_cols."""
-    cols = df_or_cols if isinstance(df_or_cols, (list, set)) else list(df_or_cols.columns)
+    if isinstance(df_or_cols, (list, set, tuple)):
+        cols = set(df_or_cols)
+    else:
+        cols = set(df_or_cols.columns)
     return [c for c in column_list if c in cols]
 
 
@@ -77,16 +80,18 @@ def build_preprocessor(available_columns: list[str] | None = None) -> ColumnTran
     """
     Build a ColumnTransformer that handles missing Kumbhar columns gracefully.
 
-    If available_columns is given, only those numeric features that are actually
-    present will be included.  Unknown columns are silently skipped so that a
-    Ben Roshan-only run still works without modification.
+    If available_columns is given, only columns that are actually present are
+    included.  Unknown columns are silently skipped so that a Ben Roshan-only
+    run still works without modification.
     """
-    numeric_cols = (
-        _columns_present(available_columns, config.ALL_NUMERIC)
-        if available_columns is not None
-        else config.ALL_NUMERIC
-    )
-    categorical_cols = config.CATEGORICAL_FEATURES
+    if available_columns is not None:
+        numeric_cols = _columns_present(available_columns, config.ALL_NUMERIC)
+        categorical_cols = _columns_present(
+            available_columns, config.CATEGORICAL_FEATURES
+        )
+    else:
+        numeric_cols = config.ALL_NUMERIC
+        categorical_cols = config.CATEGORICAL_FEATURES
 
     numeric_pipeline = make_pipeline(
         SimpleImputer(strategy="median"),

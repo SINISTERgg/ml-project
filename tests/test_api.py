@@ -119,13 +119,14 @@ class TestHealth:
 
 VALID_PAYLOAD: dict[str, Any] = {
     "gender": "M",
-    "ssc_p": 67.0, "ssc_b": "Others",
-    "hsc_p": 91.0, "hsc_b": "Others", "hsc_s": "Commerce",
+    "tenth_p": 67.0, "tenth_b": "Others",
+    "twelfth_p": 91.0, "twelfth_b": "Others", "twelfth_s": "Commerce",
     "degree_p": 58.0, "degree_t": "Sci&Tech",
     "workex": "No",
     "etest_p": 55.0,
     "specialisation": "Mkt&HR",
     "mba_p": 58.8,
+    "has_masters": "Yes", "masters_type": "MBA",
 }
 
 
@@ -152,14 +153,32 @@ class TestPredict:
         assert "salary_estimate" not in body
 
     def test_predict_missing_required_field_422(self, client):
-        bad = {k: v for k, v in VALID_PAYLOAD.items() if k != "mba_p"}
+        bad = {k: v for k, v in VALID_PAYLOAD.items() if k != "tenth_p"}
         resp = client.post("/api/predict", json=bad)
         assert resp.status_code == 422
 
     def test_predict_out_of_range_422(self, client):
-        bad = {**VALID_PAYLOAD, "ssc_p": 150}  # > 100
+        bad = {**VALID_PAYLOAD, "tenth_p": 150}  # > 100
         resp = client.post("/api/predict", json=bad)
         assert resp.status_code == 422
+
+    def test_predict_invalid_masters_type_422(self, client):
+        bad = {**VALID_PAYLOAD, "masters_type": "PhD"}
+        resp = client.post("/api/predict", json=bad)
+        assert resp.status_code == 422
+
+    def test_no_masters_forces_type_none(self, client):
+        from app.main import PlacementInput
+
+        payload = {**VALID_PAYLOAD, "has_masters": "No", "masters_type": "MBA"}
+        obj = PlacementInput(**payload)
+        assert obj.masters_type == "None"
+
+    def test_predict_without_masters_fields_defaults(self, client):
+        legacy = {k: v for k, v in VALID_PAYLOAD.items()
+                  if k not in ("has_masters", "masters_type", "mba_p")}
+        resp = client.post("/api/predict", json=legacy)
+        assert resp.status_code == 200
 
     def test_predict_invalid_literal_422(self, client):
         bad = {**VALID_PAYLOAD, "gender": "X"}

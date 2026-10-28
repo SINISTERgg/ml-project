@@ -83,34 +83,34 @@
           </select>
         </label>
         <label class="field">
-          <span>SSC Board</span>
-          <select name="ssc_b" id="f-ssc_b">
+          <span>10th Board</span>
+          <select name="tenth_b" id="f-tenth_b">
             <option value="Others">Others</option>
             <option value="Central">Central</option>
           </select>
         </label>
         <label class="field">
-          <span>SSC Percentage</span>
-          <input type="number" name="ssc_p" id="f-ssc_p" min="0" max="100" step="0.01" required placeholder="e.g. 67" />
+          <span>10th Percentage</span>
+          <input type="number" name="tenth_p" id="f-tenth_p" min="0" max="100" step="0.01" required placeholder="e.g. 67" />
         </label>
         <label class="field">
-          <span>HSC Board</span>
-          <select name="hsc_b" id="f-hsc_b">
+          <span>12th Board</span>
+          <select name="twelfth_b" id="f-twelfth_b">
             <option value="Others">Others</option>
             <option value="Central">Central</option>
           </select>
         </label>
         <label class="field">
-          <span>HSC Stream</span>
-          <select name="hsc_s" id="f-hsc_s">
+          <span>12th Stream</span>
+          <select name="twelfth_s" id="f-twelfth_s">
             <option value="Commerce">Commerce</option>
             <option value="Science">Science</option>
             <option value="Arts">Arts</option>
           </select>
         </label>
         <label class="field">
-          <span>HSC Percentage</span>
-          <input type="number" name="hsc_p" id="f-hsc_p" min="0" max="100" step="0.01" required placeholder="e.g. 91" />
+          <span>12th Percentage</span>
+          <input type="number" name="twelfth_p" id="f-twelfth_p" min="0" max="100" step="0.01" required placeholder="e.g. 91" />
         </label>
         <label class="field">
           <span>Degree Specialisation</span>
@@ -125,15 +125,30 @@
           <input type="number" name="degree_p" id="f-degree_p" min="0" max="100" step="0.01" required placeholder="e.g. 58" />
         </label>
         <label class="field">
+          <span>Completed a Master's?</span>
+          <select name="has_masters" id="f-has_masters">
+            <option value="No">No</option>
+            <option value="Yes">Yes</option>
+          </select>
+        </label>
+        <label class="field" id="masters-type-field" hidden>
+          <span>Masters Programme</span>
+          <select name="masters_type" id="f-masters_type">
+            <option value="MBA">MBA</option>
+            <option value="MS">MS</option>
+            <option value="Other">Other</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Masters Percentage</span>
+          <input type="number" name="mba_p" id="f-mba_p" min="0" max="100" step="0.01" required placeholder="e.g. 58.8" />
+        </label>
+        <label class="field" id="specialisation-field" hidden>
           <span>MBA Specialisation</span>
           <select name="specialisation" id="f-specialisation">
             <option value="Mkt&amp;HR">Mkt &amp; HR</option>
             <option value="Mkt&amp;Fin">Mkt &amp; Fin</option>
           </select>
-        </label>
-        <label class="field">
-          <span>MBA Percentage</span>
-          <input type="number" name="mba_p" id="f-mba_p" min="0" max="100" step="0.01" required placeholder="e.g. 58.8" />
         </label>
         <label class="field">
           <span>Employability Test %</span>
@@ -246,7 +261,7 @@
       <h2>Bulk Scoring</h2>
       <span class="note">One JSON profile per line (max 1,000)</span>
     </div>
-    <textarea id="batch-input" rows="6" spellcheck="false" placeholder='{"gender":"M","ssc_p":67,"ssc_b":"Others","hsc_p":91,"hsc_b":"Others","hsc_s":"Commerce","degree_p":58,"degree_t":"Sci&Tech","workex":"No","etest_p":55,"specialisation":"Mkt&HR","mba_p":58.8}'></textarea>
+    <textarea id="batch-input" rows="6" spellcheck="false" placeholder='{"gender":"M","tenth_p":67,"tenth_b":"Others","twelfth_p":91,"twelfth_b":"Others","twelfth_s":"Commerce","degree_p":58,"degree_t":"Sci&Tech","workex":"No","etest_p":55,"specialisation":"Mkt&HR","mba_p":58.8,"has_masters":"Yes","masters_type":"MBA"}'></textarea>
     <div class="actions">
       <button id="batch-example" type="button" class="btn ghost">Insert example</button>
       <button id="batch-run" type="button" class="btn primary">

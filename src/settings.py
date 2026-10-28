@@ -55,10 +55,12 @@ class TrainSettings:
 # ── Default category options (used by the counterfactual engine) ──────────────
 DEFAULT_CATEGORY_OPTIONS = {
     "gender":         ["M", "F"],
-    "ssc_b":          ["Central", "Others"],
-    "hsc_b":          ["Central", "Others"],
-    "hsc_s":          ["Commerce", "Science", "Arts"],
+    "tenth_b":        ["Central", "Others"],
+    "twelfth_b":      ["Central", "Others"],
+    "twelfth_s":      ["Commerce", "Science", "Arts"],
     "degree_t":       ["Sci&Tech", "Comm&Mgmt", "Others"],
     "workex":         ["Yes", "No"],
     "specialisation": ["Mkt&Fin", "Mkt&HR"],
+    "has_masters":    ["Yes", "No"],
+    "masters_type":   ["None", "MBA", "MS", "Other"],
 }

@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from src import config, experiments, monitor
 from src.counterfactual import suggest
@@ -114,17 +114,20 @@ def _log_count() -> int:
 class PlacementInput(BaseModel):
     # Ben Roshan features (always required)
     gender: Literal["M", "F"]
-    ssc_p: float = Field(ge=0, le=100)
-    ssc_b: Literal["Central", "Others"]
-    hsc_p: float = Field(ge=0, le=100)
-    hsc_b: Literal["Central", "Others"]
-    hsc_s: Literal["Commerce", "Science", "Arts"]
+    tenth_p: float = Field(ge=0, le=100)
+    tenth_b: Literal["Central", "Others"]
+    twelfth_p: float = Field(ge=0, le=100)
+    twelfth_b: Literal["Central", "Others"]
+    twelfth_s: Literal["Commerce", "Science", "Arts"]
     degree_p: float = Field(ge=0, le=100)
     degree_t: Literal["Sci&Tech", "Comm&Mgmt", "Others"]
     workex: Literal["Yes", "No"]
     etest_p: float = Field(ge=0, le=100)
     specialisation: Literal["Mkt&Fin", "Mkt&HR"]
-    mba_p: float = Field(ge=0, le=100)
+    mba_p: float = Field(default=0.0, ge=0, le=100)
+    # Masters pathway
+    has_masters: Literal["Yes", "No"] = "No"
+    masters_type: Literal["None", "MBA", "MS", "Other"] = "None"
     # Kumbhar features (optional — improves predictions when present)
     cgpa: float | None = Field(default=None, ge=0, le=10)
     internships: int | None = Field(default=None, ge=0)
@@ -132,6 +135,15 @@ class PlacementInput(BaseModel):
     workshops: int | None = Field(default=None, ge=0)
     aptitude_score: float | None = Field(default=None, ge=0, le=100)
     soft_skills: float | None = Field(default=None, ge=0, le=10)
+
+    @model_validator(mode="after")
+    def _sync_masters(self):
+        """Keep the masters flag and programme type consistent."""
+        if self.has_masters == "No":
+            self.masters_type = "None"
+        elif self.masters_type == "None":
+            self.masters_type = "MBA"
+        return self
 
 
 class BatchRequest(BaseModel):

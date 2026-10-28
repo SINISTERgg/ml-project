@@ -66,7 +66,19 @@ def select_champion(run_id, meta, run_root):
     current = champion_score(meta)
     current_champion = registry.get("champion")
     is_better = False
-    if current_champion is None:
+    schema_changed = False
+    if current_champion is not None:
+        prev_meta_path = config.RUNS_DIR / current_champion["run_id"] / "meta.json"
+        if prev_meta_path.exists():
+            prev_meta = json.loads(prev_meta_path.read_text())
+            prev_features = prev_meta.get("feature_names")
+            new_features = meta.get("feature_names")
+            schema_changed = (
+                prev_features is not None
+                and new_features is not None
+                and prev_features != new_features
+            )
+    if current_champion is None or schema_changed:
         is_better = True
     else:
         prev = next((r for r in registry["runs"] if r["run_id"] == current_champion["run_id"]), None)
@@ -85,6 +97,7 @@ def select_champion(run_id, meta, run_root):
             ("explainer_info.json", config.EXPLAINER_INFO_PATH),
             ("reference_features.json", config.REFERENCE_PATH),
             ("meta.json", config.META_PATH),
+            ("shap_values.npy", config.SHAP_VALUES_PATH),
         ]:
             src = run_root / rel
             if src.exists():

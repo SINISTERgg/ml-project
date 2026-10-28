@@ -65,17 +65,19 @@ class TestPipelineE2E:
         pred = Predictor(bundle_path=models_dir / "bundle.joblib")
         raw = {
             "gender": "M",
-            "ssc_p": 67.0,
-            "ssc_b": "Others",
-            "hsc_p": 91.0,
-            "hsc_b": "Others",
-            "hsc_s": "Commerce",
+            "tenth_p": 67.0,
+            "tenth_b": "Others",
+            "twelfth_p": 91.0,
+            "twelfth_b": "Others",
+            "twelfth_s": "Commerce",
             "degree_p": 58.0,
             "degree_t": "Sci&Tech",
             "workex": "No",
             "etest_p": 55.0,
             "specialisation": "Mkt&HR",
             "mba_p": 58.8,
+            "has_masters": "Yes",
+            "masters_type": "MBA",
         }
         out = pred.predict(raw)
         assert out["prediction"] in {"Placed", "Not Placed"}

@@ -1,4 +1,4 @@
-from src.counterfactual import ACTIONABLE_SPECS, IMMUTABLE_FEATURES, suggest
+﻿from src.counterfactual import ACTIONABLE_SPECS, IMMUTABLE_FEATURES, suggest
 
 
 class DummyPredictor:
@@ -21,11 +21,11 @@ class TestCounterfactual:
         pred = DummyPredictor()
         raw = {
             "gender": "M",
-            "ssc_p": 60,
-            "ssc_b": "Others",
-            "hsc_p": 60,
-            "hsc_b": "Others",
-            "hsc_s": "Commerce",
+            "tenth_p": 60,
+            "tenth_b": "Others",
+            "twelfth_p": 60,
+            "twelfth_b": "Others",
+            "twelfth_s": "Commerce",
             "degree_p": 55,
             "degree_t": "Comm&Mgmt",
             "workex": "No",
@@ -49,11 +49,11 @@ class TestCounterfactual:
         pred = DummyPredictor()
         raw = {
             "gender": "F",
-            "ssc_p": 45,
-            "ssc_b": "Central",
-            "hsc_p": 48,
-            "hsc_b": "Central",
-            "hsc_s": "Arts",
+            "tenth_p": 45,
+            "tenth_b": "Central",
+            "twelfth_p": 48,
+            "twelfth_b": "Central",
+            "twelfth_s": "Arts",
             "degree_p": 50,
             "degree_t": "Others",
             "workex": "No",
@@ -72,11 +72,11 @@ class TestCounterfactual:
         pred = DummyPredictor()
         raw = {
             "gender": "M",
-            "ssc_p": 80,
-            "ssc_b": "Central",
-            "hsc_p": 85,
-            "hsc_b": "Central",
-            "hsc_s": "Science",
+            "tenth_p": 80,
+            "tenth_b": "Central",
+            "twelfth_p": 85,
+            "twelfth_b": "Central",
+            "twelfth_s": "Science",
             "degree_p": 82,
             "degree_t": "Sci&Tech",
             "workex": "Yes",

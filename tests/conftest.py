@@ -10,11 +10,11 @@ def sample_benroshan_df():
     """Minimal 10-row DataFrame mimicking the Ben Roshan dataset."""
     return pd.DataFrame({
         "gender":        ["M", "F", "M", "F", "M", "F", "M", "M", "F", "M"],
-        "ssc_p":         [67.0, 74.0, 55.0, 83.0, 60.0, 71.0, 90.0, 45.0, 78.0, 65.0],
-        "ssc_b":         ["Others"] * 10,
-        "hsc_p":         [91.0, 68.0, 60.0, 77.0, 55.0, 85.0, 88.0, 50.0, 72.0, 69.0],
-        "hsc_b":         ["Central"] * 10,
-        "hsc_s":         ["Commerce", "Science", "Arts", "Commerce", "Science",
+        "tenth_p":       [67.0, 74.0, 55.0, 83.0, 60.0, 71.0, 90.0, 45.0, 78.0, 65.0],
+        "tenth_b":       ["Others"] * 10,
+        "twelfth_p":     [91.0, 68.0, 60.0, 77.0, 55.0, 85.0, 88.0, 50.0, 72.0, 69.0],
+        "twelfth_b":     ["Central"] * 10,
+        "twelfth_s":     ["Commerce", "Science", "Arts", "Commerce", "Science",
                           "Commerce", "Science", "Arts", "Commerce", "Science"],
         "degree_p":      [58.0, 65.0, 53.0, 70.0, 57.0, 62.0, 80.0, 48.0, 66.0, 59.0],
         "degree_t":      ["Sci&Tech", "Comm&Mgmt", "Others", "Sci&Tech", "Comm&Mgmt",
@@ -24,6 +24,10 @@ def sample_benroshan_df():
         "specialisation":["Mkt&HR", "Mkt&Fin", "Mkt&HR", "Mkt&Fin", "Mkt&HR",
                           "Mkt&Fin", "Mkt&HR", "Mkt&HR", "Mkt&Fin", "Mkt&HR"],
         "mba_p":         [58.8, 66.0, 55.0, 72.0, 57.0, 61.0, 76.0, 50.0, 68.0, 60.0],
+        "has_masters":   ["Yes", "Yes", "No", "Yes", "No",
+                          "Yes", "Yes", "No", "Yes", "No"],
+        "masters_type":  ["MBA", "MS", "None", "MBA", "None",
+                          "Other", "MBA", "None", "MS", "None"],
         "status":        ["Placed", "Placed", "Not Placed", "Placed", "Not Placed",
                           "Placed", "Placed", "Not Placed", "Placed", "Not Placed"],
         "salary":        [270000.0, 300000.0, np.nan, 350000.0, np.nan,
@@ -53,11 +57,12 @@ def predict_payload():
     """Valid prediction request payload (Ben Roshan schema)."""
     return {
         "gender": "M",
-        "ssc_p": 67.0, "ssc_b": "Others",
-        "hsc_p": 91.0, "hsc_b": "Others", "hsc_s": "Commerce",
+        "tenth_p": 67.0, "tenth_b": "Others",
+        "twelfth_p": 91.0, "twelfth_b": "Others", "twelfth_s": "Commerce",
         "degree_p": 58.0, "degree_t": "Sci&Tech",
         "workex": "No",
         "etest_p": 55.0,
         "specialisation": "Mkt&HR",
         "mba_p": 58.8,
+        "has_masters": "Yes", "masters_type": "MBA",
     }

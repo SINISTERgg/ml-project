@@ -35,6 +35,85 @@ def _normalise_target(series: pd.Series) -> pd.Series:
     return series.astype(str).str.strip().str.lower().map(mapping).fillna(series)
 
 
+def _rename_legacy_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Migrate SSC/HSC-style column names to the current 10th/12th schema."""
+    renames = {old: new for old, new in config.LEGACY_COLUMN_RENAMES.items()
+               if old in df.columns and new not in df.columns}
+    return df.rename(columns=renames) if renames else df
+
+
+def add_masters_fields(df: pd.DataFrame, seed: int | None = None) -> pd.DataFrame:
+    """
+    Ensure `has_masters` and `masters_type` exist.
+
+    The public Kaggle datasets do not record non-MBA master's programmes, so
+    when the fields are absent this function synthesises them deterministically
+    from a fixed seed.  Rows that *do* carry an MBA score (the Ben Roshan MBA
+    cohort) are always marked as master's holders; the programme type is
+    sampled as MBA/MS/Other.  Rows without any master's information are
+    assigned Yes/No with equal probability.
+
+    Important: this is synthetic augmentation for the academic demo and is
+    intentionally independent of the target, so it cannot leak label signal.
+    Replace it with real programme data when available.
+    """
+    df = df.copy()
+    rng = np.random.default_rng(config.RANDOM_STATE if seed is None else seed)
+    n = len(df)
+    if n == 0:
+        df["has_masters"] = pd.Series(dtype=object)
+        df["masters_type"] = pd.Series(dtype=object)
+        return df
+
+    def _existing(column: str) -> pd.Series:
+        if column in df.columns:
+            return df[column].astype(object).where(df[column].notna(), None)
+        return pd.Series([None] * n, index=df.index, dtype=object)
+
+    has = _existing("has_masters")
+    mtype = _existing("masters_type")
+
+    # Normalise any provided values (e.g. "1"/"0", "yes"/"no").
+    norm_has = has.astype(str).str.strip().str.lower().map(
+        {"yes": "Yes", "y": "Yes", "1": "Yes", "true": "Yes",
+         "no": "No", "n": "No", "0": "No", "false": "No"}
+    )
+    has = has.where(has.isna(), norm_has)
+    norm_type = mtype.astype(str).str.strip().str.title().map(
+        {"Mba": "MBA", "Ms": "MS", "Other": "Other", "None": "None"}
+    )
+    mtype = mtype.where(mtype.isna(), norm_type)
+
+    known_mba = (
+        df["mba_p"].notna() if "mba_p" in df.columns
+        else pd.Series(False, index=df.index)
+    )
+
+    # 1. Fill missing has_masters: MBA cohort -> Yes, others 50/50.
+    missing_has = has.isna()
+    yes_prob = np.where(known_mba, 1.0, 0.5)
+    synth_has = np.where(rng.random(n) < yes_prob, "Yes", "No")
+    has = has.where(~missing_has, synth_has)
+
+    # 2. Fill missing masters_type for master's holders.
+    draws = rng.random(n)
+    mba_cut, ms_cut = np.where(known_mba, 0.60, 0.50), np.where(known_mba, 0.85, 0.80)
+    synth_type = np.where(
+        draws < mba_cut, "MBA", np.where(draws < ms_cut, "MS", "Other")
+    )
+    missing_type = mtype.isna()
+    mtype = mtype.where(~missing_type, synth_type)
+
+    # 3. Enforce consistency: no masters -> type "None"; masters -> never None.
+    mtype = mtype.where(has.eq("Yes"), "None")
+    mtype = mtype.where(~(has.eq("Yes") & mtype.eq("None")), "MBA")
+
+    df["has_masters"] = has
+    df["masters_type"] = mtype
+    return df
+
+
+
 # ── Ben Roshan loader ─────────────────────────────────────────────────────────
 
 def load_benroshan(path=None) -> pd.DataFrame:
@@ -50,6 +129,9 @@ def load_benroshan(path=None) -> pd.DataFrame:
                 "Download with: kaggle datasets download -d benroshan/factors-affecting-campus-placement"
             )
     df = pd.read_csv(path)
+
+    # Migrate legacy SSC/HSC column names to the 10th/12th schema.
+    df = _rename_legacy_columns(df)
 
     # Drop ID column if present
     for id_col in config.ID_FEATURES:
@@ -75,7 +157,7 @@ def load_benroshan(path=None) -> pd.DataFrame:
             df[col] = np.nan
 
     df["_source"] = "benroshan"
-    return df
+    return add_masters_fields(df)
 
 
 # ── Kumbhar loader ────────────────────────────────────────────────────────────
@@ -92,6 +174,7 @@ def load_kumbhar(path=None) -> pd.DataFrame:
 
     # Rename columns to the unified schema
     df = df.rename(columns=config.KUMBHAR_COL_MAP)
+    df = _rename_legacy_columns(df)
 
     # Normalise target
     df[config.TARGET] = _normalise_target(df[config.TARGET])
@@ -108,7 +191,7 @@ def load_kumbhar(path=None) -> pd.DataFrame:
 
     # Fill Ben Roshan-style percentage columns from CGPA (rough conversion)
     if "cgpa" in df.columns:
-        for pct_col in ("ssc_p", "hsc_p", "degree_p"):
+        for pct_col in ("tenth_p", "twelfth_p", "degree_p"):
             if pct_col not in df.columns:
                 df[pct_col] = (df["cgpa"] * 9.5).clip(0, 100)
 
@@ -119,9 +202,9 @@ def load_kumbhar(path=None) -> pd.DataFrame:
     # Fill missing Ben Roshan categoricals with sensible defaults
     for col, default in [
         ("gender", "M"),
-        ("ssc_b", "Others"),
-        ("hsc_b", "Others"),
-        ("hsc_s", "Commerce"),
+        ("tenth_b", "Others"),
+        ("twelfth_b", "Others"),
+        ("twelfth_s", "Commerce"),
         ("degree_t", "Comm&Mgmt"),
         ("specialisation", "Mkt&HR"),
         ("mba_p", np.nan),
@@ -134,7 +217,7 @@ def load_kumbhar(path=None) -> pd.DataFrame:
         df[config.SALARY_TARGET] = np.nan
 
     df["_source"] = "kumbhar"
-    return df
+    return add_masters_fields(df)
 
 
 # ── Merge helper ──────────────────────────────────────────────────────────────
@@ -154,10 +237,22 @@ def merge_datasets(ben: pd.DataFrame, kumbhar: pd.DataFrame) -> pd.DataFrame:
     # Missing values are intentionally left untouched here.  Imputation is
     # fitted inside the sklearn pipeline on X_train only (see features.py),
     # which prevents validation/test information from leaking into training.
-    return merged
+    return add_masters_fields(merged)
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
+
+_CACHE_REQUIRED_COLUMNS = set(
+    config.BENROSHAN_NUMERIC
+    + config.BENROSHAN_CATEGORICAL
+    + [config.TARGET]
+)
+
+
+def _cache_is_current(df: pd.DataFrame) -> bool:
+    """Return True when a cached CSV matches the current schema."""
+    return _CACHE_REQUIRED_COLUMNS.issubset(df.columns)
+
 
 def load_data(force_reload: bool = False) -> pd.DataFrame:
     """
@@ -167,9 +262,13 @@ def load_data(force_reload: bool = False) -> pd.DataFrame:
     BENROSHAN_CATEGORICAL + TARGET columns.
     Kumbhar columns will be NaN when not available.
     """
-    # Use cached merged file if available (and not forced)
+    # Use cached merged file if available and schema-compatible.
     if not force_reload and config.DATA_PATH.exists():
-        return pd.read_csv(config.DATA_PATH)
+        # Keep "None" as a real masters_type category instead of pandas' NA.
+        cached = pd.read_csv(config.DATA_PATH, keep_default_na=False, na_values=[""])
+        if _cache_is_current(cached):
+            return cached
+        print(f"Cached dataset schema is outdated (v{config.SCHEMA_VERSION}); reloading…")
 
     ben_available = (
         config.BENROSHAN_PATH.exists() or config.LEGACY_DATA_PATH.exists()
@@ -185,7 +284,7 @@ def load_data(force_reload: bool = False) -> pd.DataFrame:
         print(f"  Merged -> {len(df)} rows, cached to {config.DATA_PATH}")
     elif ben_available:
         print("Loading Ben Roshan dataset only (Kumbhar not found)…")
-        df = load_benroshan()
+        df = add_masters_fields(load_benroshan())
         df.to_csv(config.DATA_PATH, index=False)
         print(f"  {len(df)} rows loaded.")
     else:

@@ -1,4 +1,4 @@
-import numpy as np
+﻿import numpy as np
 import pandas as pd
 
 from src import config
@@ -27,11 +27,11 @@ class TestSalaryTraining:
                 config.TARGET: ["Placed"] * 10 + ["Not Placed"] * 20,
                 config.SALARY_TARGET: [300000.0] * 10 + [np.nan] * 20,
                 "gender": ["M"] * 30,
-                "ssc_p": [70.0] * 30,
-                "ssc_b": ["Central"] * 30,
-                "hsc_p": [70.0] * 30,
-                "hsc_b": ["Central"] * 30,
-                "hsc_s": ["Science"] * 30,
+                "tenth_p": [70.0] * 30,
+                "tenth_b": ["Central"] * 30,
+                "twelfth_p": [70.0] * 30,
+                "twelfth_b": ["Central"] * 30,
+                "twelfth_s": ["Science"] * 30,
                 "degree_p": [70.0] * 30,
                 "degree_t": ["Sci&Tech"] * 30,
                 "workex": ["Yes"] * 30,

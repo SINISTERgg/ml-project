@@ -48,7 +48,10 @@ def build_raw(algo, params, scale_pos_weight=1.0):
             scale_pos_weight=scale_pos_weight, eval_metric="logloss", random_state=rs,
         )
     if algo == "svc":
-        return SVC(C=params["C"], gamma=params["gamma"], class_weight="balanced", random_state=rs)
+        return SVC(
+            C=params["C"], gamma=params["gamma"], class_weight="balanced",
+            probability=True, random_state=rs,
+        )
     raise ValueError(f"Unknown algorithm: {algo}")
 
 

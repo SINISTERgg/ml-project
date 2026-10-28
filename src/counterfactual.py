@@ -10,10 +10,11 @@ from __future__ import annotations
 
 # Immutable attributes: never suggest changing demographics or past records.
 IMMUTABLE_FEATURES = {
-    "gender", "ssc_b", "hsc_b", "ssc_p", "hsc_p",
-    # Stream/degree/specialisation/work-experience are also treated as fixed
-    # context for the current application cycle.
-    "hsc_s", "degree_t", "specialisation", "workex",
+    "gender", "tenth_b", "twelfth_b", "tenth_p", "twelfth_p",
+    # Stream/degree/specialisation/work-experience/masters are also treated as
+    # fixed context for the current application cycle.
+    "twelfth_s", "degree_t", "specialisation", "workex",
+    "has_masters", "masters_type",
 }
 
 # Actionable attributes with scale-specific bounds and search steps.

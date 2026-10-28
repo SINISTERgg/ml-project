@@ -1,3 +1,4 @@
+# ruff: noqa: E702
 from pptx import Presentation
 
 prs = Presentation()
@@ -72,7 +73,7 @@ s = prs.slides.add_slide(content_layout)
 add_title(s, 'Week 10 — Testing, Report & Demo Prep')
 tf = s.placeholders[1].text_frame; tf.clear()
 for t in ['New tests: salary, counterfactual, monitor, end-to-end pipeline',
-          '47 tests passing | lint improved',
+          '57 tests passing | lint clean',
           'Report updated with Phase 1+2 mapping',
           'Demo runbook ready',
           'Final integration verified']:
@@ -83,9 +84,9 @@ s = prs.slides.add_slide(content_layout)
 add_title(s, 'Final Results (Held-out Test)')
 tf = s.placeholders[1].text_frame; tf.clear()
 for t in ['Champion: SVC (surrogate XGBoost for SHAP)',
-          'ROC-AUC: 0.913 | PR-AUC: 0.962 | F1: 0.873',
-          'Precision: 0.960 | Recall: 0.800 | Brier: 0.135',
-          'Threshold: 0.553 (F1-optimised)',
+          'ROC-AUC: 0.926 | PR-AUC: 0.968 | F1: 0.830',
+          'Precision: 0.957 | Recall: 0.733 | Brier: 0.116',
+          'Threshold: 0.745 (F1-optimised)',
           'SHAP + Counterfactuals + Salary estimation']:
     p = tf.add_paragraph(); p.text = t; p.level = 0
 

@@ -27,9 +27,14 @@ class Predictor:
         self.explainer = joblib.load(config.EXPLAINER_PATH)
         info_path = config.EXPLAINER_INFO_PATH
         self.explainer_info = json.loads(info_path.read_text()) if info_path.exists() else {}
-        # Only Ben Roshan fields are strictly required; Kumbhar columns are optional
-        # and improve predictions when provided (handled by add_feature_engineering).
-        self.required = config.BENROSHAN_NUMERIC + config.CATEGORICAL_FEATURES
+        # Only core Ben Roshan fields are strictly required.  Masters fields
+        # are normalised with sensible defaults for backwards compatibility.
+        self.required = [
+            c for c in config.BENROSHAN_NUMERIC if c != "mba_p"
+        ] + [
+            c for c in config.CATEGORICAL_FEATURES
+            if c not in ("has_masters", "masters_type")
+        ]
         self.optional = config.KUMBHAR_NUMERIC
 
     @property
@@ -45,9 +50,27 @@ class Predictor:
         if missing:
             raise ValueError(f"Missing input fields: {', '.join(missing)}")
 
+    @staticmethod
+    def _normalise_masters(raw):
+        """Return (has_masters, masters_type, mba_p) consistent values."""
+        value = str(raw.get("has_masters", "No")).strip().lower()
+        has_masters = "Yes" if value in {"yes", "y", "1", "true"} else "No"
+        mba_p = raw.get("mba_p")
+        if mba_p in (None, ""):
+            mba_p = 0.0
+        if has_masters == "No":
+            return has_masters, "None", float(mba_p)
+        mtype = str(raw.get("masters_type", "")).strip().title()
+        mtype = {"Mba": "MBA", "Ms": "MS", "Other": "Other"}.get(mtype, "MBA")
+        return has_masters, mtype, float(mba_p)
+
     def _table(self, raw):
         self._validate(raw)
         fields = {k: raw.get(k) for k in self.required}
+        has_masters, masters_type, mba_p = self._normalise_masters(raw)
+        fields["mba_p"] = mba_p
+        fields["has_masters"] = has_masters
+        fields["masters_type"] = masters_type
         for k in self.optional:
             if k in raw:
                 fields[k] = raw[k]

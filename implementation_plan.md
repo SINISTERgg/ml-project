@@ -121,7 +121,7 @@ gantt
 - **Action:**
   - Guard against `None` values in optional Kumbhar attributes.
   - Partition attributes into:
-    - **Immutable / Non-Actionable:** `gender`, `ssc_b`, `hsc_b`, `ssc_p`, `hsc_p` (cannot advise candidate to change demographic or past school records).
+    - **Immutable / Non-Actionable:** `gender`, `tenth_b`, `twelfth_b`, `tenth_p`, `twelfth_p`, `has_masters`, `masters_type` (cannot advise candidate to change demographic, past school records, or completed degrees).
     - **Actionable / Modifiable:** `internships`, `projects`, `workshops`, `soft_skills`, `etest_p`, `degree_p`, `mba_p`.
   - Apply scale-specific bounds and step increments:
     - CGPA / Soft Skills: range 0–10, steps [0.2, 0.5, 1.0]

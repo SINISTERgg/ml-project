@@ -1,9 +1,11 @@
 {
   "n_train": 118,
   "n_test": 30,
-  "mae": 63807.60833333333,
-  "r2": -0.12322512180073986,
-  "margin": 97447.32719379528,
+  "mae": 60931.41093749997,
+  "r2": -0.012287220609633165,
+  "margin": 105840.09374999993,
+  "margin_method": "p80_absolute_residual",
+  "target_transform": "log1p",
   "band_low": 250000,
   "band_high": 400000
 }

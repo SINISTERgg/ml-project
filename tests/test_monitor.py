@@ -1,4 +1,4 @@
-import json
+﻿import json
 
 import numpy as np
 import pandas as pd
@@ -10,7 +10,7 @@ class TestMonitor:
     def test_log_prediction_is_safe_with_lock(self, tmp_path, monkeypatch):
         log_path = tmp_path / "predictions.jsonl"
         monkeypatch.setattr(config, "PREDICTION_LOG_PATH", log_path)
-        payload = {"gender": "M", "ssc_p": 70}
+        payload = {"gender": "M", "tenth_p": 70}
         response = {"model": "XGBoost", "run_id": "r1", "prediction": "Placed", "probability": 0.8}
         monitor.log_prediction(payload, response)
         monitor.log_prediction(payload, response)
@@ -21,7 +21,7 @@ class TestMonitor:
     def test_drift_report_without_reference(self, tmp_path, monkeypatch):
         ref_path = tmp_path / "reference.json"
         monkeypatch.setattr(config, "REFERENCE_PATH", ref_path)
-        recent = pd.DataFrame({"ssc_p": [70, 80]})
+        recent = pd.DataFrame({"tenth_p": [70, 80]})
         report = monitor.drift_report(recent)
         assert report["available"] is False
 

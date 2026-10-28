@@ -12,7 +12,7 @@ STATIC_DIR = PROJECT_ROOT / "app" / "static"
 CONFIGS_DIR = PROJECT_ROOT / "configs"
 
 # ── Raw dataset file paths ────────────────────────────────────────────────────
-# Ben Roshan dataset (215 rows) — ssc_p … mba_p, status, salary
+# Ben Roshan dataset (215 rows) — tenth_p … mba_p, status, salary
 BENROSHAN_PATH = DATA_RAW_DIR / "placement_benroshan.csv"
 # Ruchika Kumbhar dataset (~10k rows) — CGPA, Internships, Projects, … PlacementStatus
 KUMBHAR_PATH = DATA_RAW_DIR / "placement_kumbhar.csv"
@@ -61,10 +61,15 @@ LABEL_MAP = {"Not Placed": 0, "Placed": 1}
 INV_LABEL_MAP = {v: k for k, v in LABEL_MAP.items()}
 
 # ── Ben Roshan feature schema (original columns) ──────────────────────────────
-BENROSHAN_NUMERIC = ["ssc_p", "hsc_p", "degree_p", "etest_p", "mba_p"]
+BENROSHAN_NUMERIC = ["tenth_p", "twelfth_p", "degree_p", "etest_p", "mba_p"]
 BENROSHAN_CATEGORICAL = [
-    "gender", "ssc_b", "hsc_b", "hsc_s", "degree_t", "workex", "specialisation"
+    "gender", "tenth_b", "twelfth_b", "twelfth_s", "degree_t", "workex",
+    "specialisation", "has_masters", "masters_type",
 ]
+
+# ── Masters programme options ─────────────────────────────────────────────────
+HAS_MASTERS_OPTIONS = ["Yes", "No"]
+MASTERS_TYPES = ["None", "MBA", "MS", "Other"]
 
 # ── Kumbhar-only columns (optional; present only when that dataset is loaded) ──
 KUMBHAR_NUMERIC = ["cgpa", "internships", "projects", "workshops", "aptitude_score", "soft_skills"]
@@ -88,10 +93,10 @@ KUMBHAR_COL_MAP = {
     "CGPA": "cgpa",
     "Cgpa": "cgpa",
     "cgpa": "cgpa",
-    "SSC_Marks": "ssc_p",
-    "ssc_marks": "ssc_p",
-    "HSC_Marks": "hsc_p",
-    "hsc_marks": "hsc_p",
+    "SSC_Marks": "tenth_p",
+    "ssc_marks": "tenth_p",
+    "HSC_Marks": "twelfth_p",
+    "hsc_marks": "twelfth_p",
     # Skills / activity
     "Internships": "internships",
     "internships": "internships",
@@ -107,11 +112,45 @@ KUMBHAR_COL_MAP = {
     "ExtracurricularActivities": "workex",
     "extracurricularActivities": "workex",
     "PlacementTraining": "placement_training",
+    # Masters fields (present in some raw exports)
+    "HasMasters": "has_masters",
+    "hasMasters": "has_masters",
+    "MastersType": "masters_type",
+    "mastersType": "masters_type",
+    "Masters": "masters_type",
     # Target
     "PlacementStatus": "status",
     "placementStatus": "status",
     "Placed": "status",          # possible raw value — handled in normaliser
 }
+
+# ── Legacy / raw column aliases → current schema ──────────────────────────────
+# The original Kaggle exports (and older project caches) still use SSC/HSC
+# names.  They are migrated to the human-friendly 10th/12th names on load so
+# the rest of the codebase only ever sees one schema.
+LEGACY_COLUMN_RENAMES = {
+    "ssc_p": "tenth_p",
+    "ssc_b": "tenth_b",
+    "hsc_p": "twelfth_p",
+    "hsc_b": "twelfth_b",
+    "hsc_s": "twelfth_s",
+    # Common alternative spellings found in third-party exports
+    "10th_p": "tenth_p",
+    "10th_marks": "tenth_p",
+    "tenth_percentage": "tenth_p",
+    "10th_board": "tenth_b",
+    "tenth_board": "tenth_b",
+    "12th_p": "twelfth_p",
+    "12th_marks": "twelfth_p",
+    "twelfth_percentage": "twelfth_p",
+    "12th_board": "twelfth_b",
+    "twelfth_board": "twelfth_b",
+    "12th_stream": "twelfth_s",
+    "twelfth_stream": "twelfth_s",
+}
+
+# Bumped whenever the persisted dataset schema changes so stale caches reload.
+SCHEMA_VERSION = 2
 
 # ── Model registry names ──────────────────────────────────────────────────────
 MODEL_NAMES = {
@@ -126,11 +165,11 @@ MODEL_NAMES = {
 
 # ── Human-readable feature labels (for SHAP display) ─────────────────────────
 FEATURE_LABELS = {
-    "ssc_p": "SSC Percentage",
-    "hsc_p": "HSC Percentage",
+    "tenth_p": "10th Grade Percentage",
+    "twelfth_p": "12th Grade Percentage",
     "degree_p": "Degree Percentage",
     "etest_p": "Employability Test %",
-    "mba_p": "MBA Percentage",
+    "mba_p": "Masters Percentage",
     "cgpa": "CGPA",
     "internships": "Internships",
     "projects": "Projects",
@@ -146,9 +185,13 @@ FEATURE_LABELS = {
 
 CATEGORY_LABELS = {
     "gender": {"F": "Female", "M": "Male"},
-    "ssc_b": {"Central": "SSC: Central Board", "Others": "SSC: Other Board"},
-    "hsc_b": {"Central": "HSC: Central Board", "Others": "HSC: Other Board"},
-    "hsc_s": {"Commerce": "HSC: Commerce", "Science": "HSC: Science", "Arts": "HSC: Arts"},
+    "tenth_b": {"Central": "10th: Central Board", "Others": "10th: Other Board"},
+    "twelfth_b": {"Central": "12th: Central Board", "Others": "12th: Other Board"},
+    "twelfth_s": {
+        "Commerce": "12th: Commerce",
+        "Science": "12th: Science",
+        "Arts": "12th: Arts",
+    },
     "degree_t": {
         "Sci&Tech": "Degree: Sci & Tech",
         "Comm&Mgmt": "Degree: Comm & Mgmt",
@@ -156,6 +199,13 @@ CATEGORY_LABELS = {
     },
     "workex": {"Yes": "Work Experience", "No": "No Work Experience"},
     "specialisation": {"Mkt&Fin": "MBA: Mkt & Fin", "Mkt&HR": "MBA: Mkt & HR"},
+    "has_masters": {"Yes": "Masters Completed", "No": "No Masters"},
+    "masters_type": {
+        "None": "No Masters",
+        "MBA": "Masters: MBA",
+        "MS": "Masters: MS",
+        "Other": "Masters: Other",
+    },
 }
 
 # ── Salary band thresholds (annual CTC in INR lakhs) ─────────────────────────
