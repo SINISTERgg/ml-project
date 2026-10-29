@@ -125,6 +125,30 @@ def drift_report(recent_df, reference=None):
     reference = reference or load_reference()
     if reference is None:
         return {"available": False, "message": "No reference distribution trained yet."}
+
+    n_samples = len(recent_df)
+    min_samples = config.DRIFT_MIN_SAMPLES
+    if n_samples == 0:
+        return {
+            "available": True,
+            "status": "no_data",
+            "n_samples": 0,
+            "min_samples": min_samples,
+            "features": [],
+            "alerts": [],
+            "message": "No predictions logged yet.",
+        }
+    if n_samples < min_samples:
+        return {
+            "available": True,
+            "status": "collecting",
+            "n_samples": n_samples,
+            "min_samples": min_samples,
+            "features": [],
+            "alerts": [],
+            "message": f"Collect at least {min_samples} predictions before drift is evaluated.",
+        }
+
     features = []
     for col, ref in reference.items():
         if col not in recent_df.columns:
@@ -140,7 +164,9 @@ def drift_report(recent_df, reference=None):
     features.sort(key=lambda f: f["psi"], reverse=True)
     return {
         "available": True,
-        "n_samples": len(recent_df),
+        "status": "ok",
+        "n_samples": n_samples,
+        "min_samples": min_samples,
         "features": features,
         "alerts": [f["feature"] for f in features if f["severity"] == "high"],
     }

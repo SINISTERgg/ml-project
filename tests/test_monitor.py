@@ -31,3 +31,18 @@ class TestMonitor:
         psi = monitor.psi(ref, values)
         assert np.isfinite(psi)
         assert psi >= 0
+
+    def test_drift_report_waits_for_minimum_samples(self):
+        ref = {"tenth_p": {"type": "numeric", "edges": [0, 50, 100], "counts": [10, 10]}}
+        recent = pd.DataFrame({"tenth_p": [10, 60, 90]})
+        report = monitor.drift_report(recent, reference=ref)
+        assert report["status"] == "collecting"
+        assert report["alerts"] == []
+        assert report["features"] == []
+        assert report["n_samples"] == 3
+
+    def test_drift_report_with_no_predictions(self):
+        ref = {"tenth_p": {"type": "numeric", "edges": [0, 50, 100], "counts": [10, 10]}}
+        report = monitor.drift_report(pd.DataFrame(), reference=ref)
+        assert report["status"] == "no_data"
+        assert report["alerts"] == []

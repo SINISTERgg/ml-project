@@ -31,6 +31,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def _no_cache_ui(request, call_next):
+    """Prevent browsers from serving stale HTML/JS/CSS after a UI update."""
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 app.mount("/static", StaticFiles(directory=str(config.STATIC_DIR)), name="static")
 app.mount("/plots", StaticFiles(directory=str(config.PLOTS_DIR)), name="plots")
 
@@ -123,7 +137,7 @@ class PlacementInput(BaseModel):
     degree_t: Literal["Sci&Tech", "Comm&Mgmt", "Others"]
     workex: Literal["Yes", "No"]
     etest_p: float = Field(ge=0, le=100)
-    specialisation: Literal["Mkt&Fin", "Mkt&HR"]
+    specialisation: Literal["Mkt&Fin", "Mkt&HR"] = "Mkt&Fin"
     mba_p: float = Field(default=0.0, ge=0, le=100)
     # Masters pathway
     has_masters: Literal["Yes", "No"] = "No"

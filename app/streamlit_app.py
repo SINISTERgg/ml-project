@@ -96,8 +96,6 @@ def build_form_inputs(defaults: dict | None = None) -> dict:
                                    float(defaults.get("degree_p", 65.0)), 0.5)
         etest_p = st.number_input("Employability Test %", 0.0, 100.0,
                                   float(defaults.get("etest_p", 65.0)), 0.5)
-        mba_p = st.number_input("Masters Percentage (0 if none)", 0.0, 100.0,
-                                float(defaults.get("mba_p", 65.0) or 0.0), 0.5)
 
     st.markdown("#### Masters, course & experience")
     c4, c5, c6 = st.columns(3)
@@ -113,23 +111,33 @@ def build_form_inputs(defaults: dict | None = None) -> dict:
                           index=CATEGORY_VALUES["workex"].index(defaults.get("workex", "No")),
                           horizontal=True)
 
+    default_spec = defaults.get("specialisation", "Mkt&Fin")
+    if default_spec not in CATEGORY_VALUES["specialisation"]:
+        default_spec = "Mkt&Fin"
+
     if has_masters == "Yes":
-        c7, c8 = st.columns(2)
         default_type = defaults.get("masters_type", "MBA")
         if default_type not in CATEGORY_VALUES["masters_type"]:
             default_type = "MBA"
+        c7, c8 = st.columns(2)
         with c7:
             masters_type = st.selectbox("Masters Programme", CATEGORY_VALUES["masters_type"],
-                                        index=CATEGORY_VALUES["masters_type"].index(default_type))
+                                        index=CATEGORY_VALUES["masters_type"].index(default_type),
+                                        key="masters_type")
         with c8:
+            mba_p = st.number_input("Masters Percentage", 0.0, 100.0,
+                                    float(defaults.get("mba_p", 65.0) or 0.0), 0.5,
+                                    key="mba_p")
+        if masters_type == "MBA":
             specialisation = st.selectbox("MBA Specialisation", CATEGORY_VALUES["specialisation"],
-                                          index=CATEGORY_VALUES["specialisation"].index(defaults.get("specialisation", "Mkt&Fin")))
+                                          index=CATEGORY_VALUES["specialisation"].index(default_spec),
+                                          key="specialisation")
+        else:
+            specialisation = default_spec
     else:
         masters_type = "None"
         mba_p = 0.0
-        specialisation = st.selectbox("MBA Specialisation (not applicable)", CATEGORY_VALUES["specialisation"],
-                                      index=CATEGORY_VALUES["specialisation"].index(defaults.get("specialisation", "Mkt&Fin")),
-                                      disabled=True)
+        specialisation = default_spec
 
     with st.expander("Optional skill features (improve accuracy)"):
         c9, c10, c11 = st.columns(3)

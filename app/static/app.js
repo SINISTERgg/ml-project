@@ -74,6 +74,13 @@ async function loadMeta() {
     ].join("");
     document.getElementById("run-line").textContent =
       `run ${meta.run_id || "?"} · ${meta.n_runs || 0} experiment(s) · ${meta.n_total || "?"} training rows`;
+    // Hero snapshot
+    const heroRoc = document.getElementById("hero-roc");
+    const heroF1 = document.getElementById("hero-f1");
+    const heroRows = document.getElementById("hero-rows");
+    if (heroRoc) heroRoc.textContent = fmt(m.roc_auc);
+    if (heroF1) heroF1.textContent = fmt(m.f1);
+    if (heroRows) heroRows.textContent = meta.n_total != null ? Number(meta.n_total).toLocaleString() : "—";
     // Pre-populate metric cards in result section
     renderMetricCards(m);
   } catch (e) { /* best-effort */ }
@@ -83,8 +90,22 @@ async function loadDrift() {
   try {
     const d = await api("/api/monitor/psi?window=200");
     const line = document.getElementById("drift-line");
-    if (!d.available) { line.textContent = "monitoring: no reference distribution yet"; return; }
-    document.getElementById("pred-count").textContent = `${d.n_samples} logged`;
+    document.getElementById("pred-count").textContent = `${d.n_samples ?? 0} logged`;
+    if (!d.available) {
+      line.className = "drift-line";
+      line.textContent = "monitoring: no reference distribution yet";
+      return;
+    }
+    if (d.status === "no_data") {
+      line.className = "drift-line";
+      line.textContent = "monitoring: no predictions logged yet";
+      return;
+    }
+    if (d.status === "collecting") {
+      line.className = "drift-line";
+      line.textContent = `monitoring: collecting samples (${d.n_samples}/${d.min_samples})`;
+      return;
+    }
     const alerts = d.alerts?.length ? d.alerts.join(", ") : null;
     line.className = "drift-line " + (alerts ? "warn" : "good");
     line.textContent = alerts
@@ -99,20 +120,36 @@ const EXAMPLE = {
   gender: "M", tenth_p: 67.0, tenth_b: "Others", twelfth_p: 91.0, twelfth_b: "Others",
   twelfth_s: "Commerce", degree_p: 58.0, degree_t: "Sci&Tech", workex: "No",
   etest_p: 55.0, mba_p: 58.8, has_masters: "Yes", masters_type: "MBA",
-  specialisation: "Mkt&HR",
+  specialisation: "Mkt&Fin",
 };
 
 const form = document.getElementById("predict-form");
 const hasMastersEl = document.getElementById("f-has_masters");
+const mastersTypeEl = document.getElementById("f-masters_type");
+
+function setVisible(el, visible) {
+  if (!el) return;
+  el.hidden = !visible;
+  // Inline display is a second safety net if another stylesheet targets the field.
+  el.style.display = visible ? "" : "none";
+}
 
 function syncMastersFields() {
   const yes = hasMastersEl.value === "Yes";
-  document.getElementById("masters-type-field").hidden = !yes;
-  document.getElementById("specialisation-field").hidden = !yes;
+  const isMba = mastersTypeEl.value === "MBA";
+
+  setVisible(document.getElementById("masters-block"), yes);
+  setVisible(document.getElementById("masters-type-field"), yes);
+  setVisible(document.getElementById("specialisation-field"), yes && isMba);
+  setVisible(document.getElementById("mba-p-field"), yes);
+
   if (!yes) document.getElementById("f-mba_p").value = 0;
 }
 
 hasMastersEl.addEventListener("change", syncMastersFields);
+hasMastersEl.addEventListener("input", syncMastersFields);
+mastersTypeEl.addEventListener("change", syncMastersFields);
+mastersTypeEl.addEventListener("input", syncMastersFields);
 syncMastersFields();
 
 document.getElementById("prefill").addEventListener("click", () => {
@@ -125,7 +162,9 @@ document.getElementById("prefill").addEventListener("click", () => {
 
 document.getElementById("clear").addEventListener("click", () => {
   form.reset();
+  syncMastersFields();
   document.getElementById("result").hidden = true;
+  document.getElementById("result-placeholder").hidden = false;
   document.getElementById("cf-result").hidden = true;
   document.getElementById("salary-badge").hidden = true;
 });
@@ -144,6 +183,7 @@ function formData() {
   } else if (!data.masters_type || data.masters_type === "None") {
     data.masters_type = "MBA";
   }
+  if (!data.specialisation) data.specialisation = "Mkt&Fin";
   // Optional Kumbhar fields — only include if non-empty
   for (const k of ["cgpa", "aptitude_score", "soft_skills"]) {
     if (data[k] === "" || data[k] == null) delete data[k];
@@ -212,6 +252,7 @@ function renderResult(p) {
   cfBtn.disabled = !p.contributors?.length;
 
   // Show panel
+  document.getElementById("result-placeholder").hidden = true;
   const resultEl = document.getElementById("result");
   resultEl.hidden = false;
   resultEl.scrollIntoView({ behavior: "smooth", block: "start" });
