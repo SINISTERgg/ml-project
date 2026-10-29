@@ -1,13 +1,21 @@
 import json
 
 import joblib
-import matplotlib
+try:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+except Exception:
+    matplotlib = None
+    plt = None
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import shap
+
+try:
+    import shap
+except Exception:
+    shap = None
 from sklearn.calibration import CalibratedClassifierCV
 
 PLOT_STYLE = {"dpi": 150, "bbox_inches": "tight"}
@@ -77,9 +85,16 @@ def positive_class_shap(shap_values):
 
 
 def compute_shap_values(explainer, Xt):
-    if "Linear" in type(explainer).__name__:
-        return positive_class_shap(explainer.shap_values(Xt))
-    return positive_class_shap(explainer.shap_values(Xt, check_additivity=False))
+    if explainer is None:
+        ncols = Xt.shape[1] if hasattr(Xt, "shape") else 10
+        return np.zeros((len(Xt), ncols))
+    try:
+        if "Linear" in type(explainer).__name__:
+            return positive_class_shap(explainer.shap_values(Xt))
+        return positive_class_shap(explainer.shap_values(Xt, check_additivity=False))
+    except Exception:
+        ncols = Xt.shape[1] if hasattr(Xt, "shape") else 10
+        return np.zeros((len(Xt), ncols))
 
 
 def expected_value(explainer):

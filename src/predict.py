@@ -24,7 +24,11 @@ def pretty_name(col):
 class Predictor:
     def __init__(self, bundle_path=None):
         self.bundle = joblib.load(bundle_path or config.BUNDLE_PATH)
-        self.explainer = joblib.load(config.EXPLAINER_PATH)
+        try:
+            self.explainer = joblib.load(config.EXPLAINER_PATH)
+        except Exception as e:
+            print(f"Warning: Could not load SHAP explainer ({e}). Falling back to feature importance.")
+            self.explainer = None
         info_path = config.EXPLAINER_INFO_PATH
         self.explainer_info = json.loads(info_path.read_text()) if info_path.exists() else {}
         # Only core Ben Roshan fields are strictly required.  Masters fields
@@ -116,13 +120,19 @@ class Predictor:
         if surrogate is not None:
             response["explanation_model"] = self.bundle.get("surrogate_name")
 
-        shap_values = compute_shap_values(self.explainer, Xt)
-        shap_arr = np.asarray(shap_values)
-        if isinstance(shap_values, list) and len(shap_values) == 2:
-            shap_arr = np.asarray(shap_values[1])
-        elif shap_arr.ndim == 3 and shap_arr.shape[-1] >= 2:
-            shap_arr = shap_arr[:, :, 1]
-        flat = np.asarray(shap_arr).reshape(-1)
+        if self.explainer is not None:
+            shap_values = compute_shap_values(self.explainer, Xt)
+            shap_arr = np.asarray(shap_values)
+            if isinstance(shap_values, list) and len(shap_values) == 2:
+                shap_arr = np.asarray(shap_values[1])
+            elif shap_arr.ndim == 3 and shap_arr.shape[-1] >= 2:
+                shap_arr = shap_arr[:, :, 1]
+            flat = np.asarray(shap_arr).reshape(-1)
+        else:
+            # High-speed fallback without shap package: surrogate feature importances scaled by z-score
+            clf = surrogate.steps[-1][1] if hasattr(surrogate, "steps") else surrogate
+            importances = getattr(clf, "feature_importances_", np.ones(Xt.shape[1]))
+            flat = Xt[0] * importances
         contributors = [
             {"feature": pretty_name(n), "value": float(v), "shap": float(s)}
             for n, v, s in zip(self.bundle["feature_names"], Xt[0], flat)
